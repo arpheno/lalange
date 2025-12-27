@@ -1,6 +1,6 @@
 import { createRxDatabase, addRxPlugin, type RxDatabase, type RxCollection, type RxStorage } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
-import { bookSchema, chapterSchema, readingStateSchema, imageSchema } from './schema';
+import { bookSchema, chapterSchema, readingStateSchema, imageSchema, rawFileSchema } from './schema';
 
 // Define types for the database
 export type BookDocType = {
@@ -10,6 +10,11 @@ export type BookDocType = {
     cover?: string;
     totalWords: number;
     chapterIds: string[];
+};
+
+export type RawFileDocType = {
+    id: string;
+    data: string;
 };
 
 export type ImageDocType = {
@@ -25,6 +30,9 @@ export type ChapterDocType = {
     bookId: string;
     index: number;
     title: string;
+    status: 'pending' | 'processing' | 'ready' | 'error';
+    progress?: number;
+    processingSpeed?: number;
     content: string[];
 };
 
@@ -50,12 +58,14 @@ export type BookCollection = RxCollection<BookDocType>;
 export type ChapterCollection = RxCollection<ChapterDocType>;
 export type ReadingStateCollection = RxCollection<ReadingStateDocType>;
 export type ImageCollection = RxCollection<ImageDocType>;
+export type RawFileCollection = RxCollection<RawFileDocType>;
 
 export type MyDatabaseCollections = {
     books: BookCollection;
     chapters: ChapterCollection;
     reading_states: ReadingStateCollection;
     images: ImageCollection;
+    raw_files: RawFileCollection;
 };
 
 export type MyDatabase = RxDatabase<MyDatabaseCollections>;
@@ -80,7 +90,7 @@ export const initDB = async (): Promise<MyDatabase> => {
         }
 
         const db = await createRxDatabase<MyDatabaseCollections>({
-            name: 'lalange_db_v2', // Bumped version/name to force fresh DB
+            name: 'lalange_db_v4', // Bumped version/name to force fresh DB
             storage,
             ignoreDuplicate: true
         });
@@ -97,6 +107,9 @@ export const initDB = async (): Promise<MyDatabase> => {
             },
             images: {
                 schema: imageSchema
+            },
+            raw_files: {
+                schema: rawFileSchema
             }
         });
 

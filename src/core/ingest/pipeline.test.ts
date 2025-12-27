@@ -1,0 +1,102 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { processChaptersInBackground } from './pipeline';
+import { initDB } from '../sync/db';
+import JSZip from 'jszip';
+
+// Mock dependencies
+vi.mock('../sync/db', () => ({
+    initDB: vi.fn(),
+}));
+
+vi.mock('../ai/ollama', () => ({
+    checkOllamaHealth: vi.fn().mockResolvedValue(true),
+    generateCompletion: vi.fn().mockResolvedValue('Fixed text'),
+}));
+
+describe('processChaptersInBackground', () => {
+    let mockDb: any;
+    let mockChapterDoc: any;
+    let mockRawFileDoc: any;
+
+    beforeEach(() => {
+        // Setup mock DB
+        mockChapterDoc = {
+            status: 'pending',
+            title: 'Chapter 1',
+            patch: vi.fn().mockImplementation(async (update) => {
+                Object.assign(mockChapterDoc, update);
+                return mockChapterDoc; // Return self as updated doc
+            }),
+            toJSON: () => mockChapterDoc
+        };
+
+        mockRawFileDoc = {
+            data: btoa('dummy zip content') // This won't be a valid zip, but we'll mock JSZip load
+        };
+
+        mockDb = {
+            raw_files: {
+                findOne: vi.fn().mockReturnValue({
+                    exec: vi.fn().mockResolvedValue(mockRawFileDoc)
+                })
+            },
+            chapters: {
+                findOne: vi.fn().mockReturnValue({
+                    exec: vi.fn().mockResolvedValue(mockChapterDoc)
+                })
+            },
+            books: {
+                findOne: vi.fn().mockReturnValue({
+                    exec: vi.fn().mockResolvedValue({
+                        incrementalPatch: vi.fn()
+                    })
+                })
+            }
+        };
+
+        (initDB as any).mockResolvedValue(mockDb);
+
+        // Mock JSZip to return a valid structure
+        const mockZip = {
+            files: {
+                'content.opf': { async: vi.fn().mockResolvedValue('<package><manifest><item id="c1" href="c1.html"/></manifest><spine><itemref idref="c1"/></spine></package>') },
+                'c1.html': { async: vi.fn().mockResolvedValue('<html><body><p>Test content</p></body></html>') }
+            },
+            file: vi.fn((name) => {
+                if (name.endsWith('.opf')) return { async: vi.fn().mockResolvedValue('<package><manifest><item id="c1" href="c1.html"/></manifest><spine><itemref idref="c1"/></spine></package>') };
+                if (name.endsWith('c1.html')) return { async: vi.fn().mockResolvedValue('<html><body><p>Test content</p></body></html>') };
+                return null;
+            })
+        };
+
+        // We need to mock JSZip.loadAsync
+        vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(mockZip as any);
+    });
+
+    it('should handle document updates without conflict', async () => {
+        // This test simulates the flow. The key is that the second patch call
+        // should use the document returned by the first patch call if RxDB returns a new instance.
+        // In our mock, we return the same instance, but in reality RxDB might return a new one.
+        // To properly test the fix, we should make our mock behave like RxDB (return new instance).
+
+        const docRev1 = { ...mockChapterDoc, _rev: '1-rev' };
+        const docRev2 = { ...mockChapterDoc, status: 'processing', _rev: '2-rev' };
+
+        // Update mock to return new instance on patch
+        docRev1.patch = vi.fn().mockResolvedValue(docRev2);
+        docRev2.patch = vi.fn().mockResolvedValue({ ...docRev2, status: 'ready', _rev: '3-rev' });
+
+        mockDb.chapters.findOne = vi.fn().mockReturnValue({
+            exec: vi.fn().mockResolvedValue(docRev1)
+        });
+
+        await processChaptersInBackground('book-id');
+
+        // Verify that the first patch was called on docRev1
+        expect(docRev1.patch).toHaveBeenCalledWith({ status: 'processing', progress: 0 });
+
+        // Verify that the second patch was called on docRev2 (the result of the first patch)
+        // If the code is buggy, it will call patch on docRev1 again or fail to use docRev2
+        expect(docRev2.patch).toHaveBeenCalled();
+    });
+});

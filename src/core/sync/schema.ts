@@ -75,6 +75,19 @@ export const chapterSchema = {
         title: {
             type: 'string'
         },
+        status: {
+            type: 'string',
+            enum: ['pending', 'processing', 'ready', 'error'],
+            default: 'pending'
+        },
+        progress: {
+            type: 'number',
+            default: 0
+        },
+        processingSpeed: {
+            type: 'number', // WPM
+            default: 0
+        },
         content: {
             type: 'array',
             items: {
@@ -84,6 +97,22 @@ export const chapterSchema = {
     },
     required: ['id', 'bookId', 'index', 'content'],
     indexes: ['bookId']
+} as const;
+
+export const rawFileSchema = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        data: {
+            type: 'string' // Base64
+        }
+    },
+    required: ['id', 'data']
 } as const;
 
 export const readingStateSchema = {

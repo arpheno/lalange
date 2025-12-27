@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
-import { ingestEpubWithLLM } from '../../core/ingest/pipeline';
+import { initialIngest, processChaptersInBackground } from '../../core/ingest/pipeline';
 
 interface LibraryProps {
     onOpenBook: (book: BookDocType) => void;
@@ -30,14 +30,15 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         setLoading(true);
         setStatus('Starting ingestion...');
         try {
-            const { book, chapters, images } = await ingestEpubWithLLM(e.target.files[0], (msg) => setStatus(msg));
+            const { book, chapters, images, rawFile } = await initialIngest(e.target.files[0], (msg) => setStatus(msg));
             const db = await initDB();
             await db.books.insert(book);
             await db.chapters.bulkInsert(chapters);
             if (images.length > 0) {
                 await db.images.bulkInsert(images);
             }
-            
+            await db.raw_files.insert(rawFile);
+
             // Initialize reading state
             await db.reading_states.insert({
                 bookId: book.id,
@@ -46,6 +47,9 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                 lastRead: Date.now(),
                 highlights: []
             });
+
+            // Start background processing
+            processChaptersInBackground(book.id).catch(console.error);
         } catch (err: any) {
             console.error(err);
             alert(err.message || 'Failed to load book');
