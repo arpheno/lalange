@@ -28,9 +28,18 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         if (!e.target.files?.[0]) return;
         setLoading(true);
         try {
-            const bookData = await ingestEpub(e.target.files[0]);
+            const { book, chapters } = await ingestEpub(e.target.files[0]);
             const db = await initDB();
-            await db.books.insert(bookData);
+            await db.books.insert(book);
+            await db.chapters.bulkInsert(chapters);
+            // Initialize reading state
+            await db.reading_states.insert({
+                bookId: book.id,
+                currentChapterId: chapters[0]?.id,
+                currentWordIndex: 0,
+                lastRead: Date.now(),
+                highlights: []
+            });
         } catch (err) {
             console.error(err);
             alert('Failed to load book');
@@ -71,10 +80,7 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                                 </div>
                             )}
                             <div className="absolute bottom-0 left-0 w-full h-1 bg-gray-700">
-                                <div
-                                    className="h-full bg-white"
-                                    style={{ width: `${(book.progress / book.totalWords) * 100}%` }}
-                                />
+                                {/* Progress bar removed for now as it requires async lookup of reading state */}
                             </div>
                         </div>
                         <h3 className="font-mono text-sm font-bold truncate">{book.title}</h3>

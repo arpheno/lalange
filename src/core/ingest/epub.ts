@@ -1,7 +1,7 @@
 import ePub from 'epubjs';
-import type { BookDocType } from '../sync/db';
+import type { BookDocType, ChapterDocType } from '../sync/db';
 
-export const ingestEpub = async (file: File): Promise<BookDocType> => {
+export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapters: ChapterDocType[] }> => {
     const arrayBuffer = await file.arrayBuffer();
     const book = ePub(arrayBuffer);
     await book.ready;
@@ -25,14 +25,16 @@ export const ingestEpub = async (file: File): Promise<BookDocType> => {
         console.warn('Failed to load cover', e);
     }
 
-    // Extract Text
-    const content: string[] = [];
+    const bookId = crypto.randomUUID();
+    const chapters: ChapterDocType[] = [];
+    let totalWords = 0;
 
     // Iterate through the spine
     // @ts-ignore - epubjs types are incomplete
     const spineItems = book.spine.items;
 
-    for (const item of spineItems) {
+    for (let i = 0; i < spineItems.length; i++) {
+        const item = spineItems[i];
         try {
             // Load the chapter
             let doc: Document;
@@ -53,15 +55,20 @@ export const ingestEpub = async (file: File): Promise<BookDocType> => {
             }
 
             // Extract text from the document
-            // We can use a simple textContent for now, but ideally we want to preserve some structure
-            // For RSVP, we just need a stream of words.
-            // We should handle paragraph breaks as pauses (maybe insert special tokens)
-
-            // Simple extraction:
             const text = doc.body.textContent || '';
             // Split by whitespace
-            const words = text.trim().split(/\s+/);
-            content.push(...words);
+            const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+
+            if (words.length > 0) {
+                chapters.push({
+                    id: `${bookId}_${i}`,
+                    bookId: bookId,
+                    index: i,
+                    title: `Chapter ${i + 1}`, // TODO: Extract real title from TOC
+                    content: words
+                });
+                totalWords += words.length;
+            }
 
             // Unload to free memory
             // @ts-ignore
@@ -75,13 +82,14 @@ export const ingestEpub = async (file: File): Promise<BookDocType> => {
     }
 
     return {
-        id: crypto.randomUUID(),
-        title: metadata.title || file.name,
-        author: metadata.creator || 'Unknown',
-        cover: coverBase64,
-        progress: 0,
-        totalWords: content.length,
-        content: content,
-        lastRead: Date.now()
+        book: {
+            id: bookId,
+            title: metadata.title || file.name,
+            author: metadata.creator || 'Unknown',
+            cover: coverBase64,
+            totalWords: totalWords,
+            chapterIds: chapters.map(c => c.id)
+        },
+        chapters: chapters
     };
 };

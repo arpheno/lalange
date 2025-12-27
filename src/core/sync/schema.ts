@@ -16,24 +16,85 @@ export const bookSchema = {
         cover: {
             type: 'string'
         },
-        progress: {
-            type: 'number',
-            default: 0
-        },
         totalWords: {
             type: 'number',
             default: 0
+        },
+        chapterIds: {
+            type: 'array',
+            items: {
+                type: 'string'
+            }
+        }
+    },
+    required: ['id', 'title']
+} as const;
+
+export const chapterSchema = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        bookId: {
+            type: 'string',
+            maxLength: 100
+        },
+        index: {
+            type: 'number'
+        },
+        title: {
+            type: 'string'
         },
         content: {
             type: 'array',
             items: {
                 type: 'string'
             }
+        }
+    },
+    required: ['id', 'bookId', 'index', 'content'],
+    indexes: ['bookId']
+} as const;
+
+export const readingStateSchema = {
+    version: 0,
+    primaryKey: 'bookId',
+    type: 'object',
+    properties: {
+        bookId: {
+            type: 'string',
+            maxLength: 100
+        },
+        currentChapterId: {
+            type: 'string'
+        },
+        currentWordIndex: {
+            type: 'number',
+            default: 0
         },
         lastRead: {
             type: 'number',
             default: 0
+        },
+        highlights: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string' },
+                    chapterId: { type: 'string' },
+                    startWordIndex: { type: 'number' },
+                    endWordIndex: { type: 'number' },
+                    text: { type: 'string' },
+                    note: { type: 'string' },
+                    createdAt: { type: 'number' }
+                }
+            }
         }
     },
-    required: ['id', 'title', 'content']
+    required: ['bookId']
 } as const;
