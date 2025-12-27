@@ -184,17 +184,7 @@ While the Phone is the device of the *Real* (raw speed, no context), the Desktop
 
 * **Real-Time Mirroring**: While reading on the phone, the phone emits its current Word Index via the local WebSocket. The Laptop subscribes to this stream. It updates its view to show the full page, scrolling automatically to keep the currently spoken word in view. This allows the user to glance at the Laptop for the "big picture" without breaking the flow on the phone. This fulfills the requirement to "update the position... so if i do feel like reading a passage slowly... i can easily reference it."
 
-### **6.2 Gemini Integration: The Silence of the Analyst**
 
-To integrate Gemini without a backend server:
-
-* **Client-Side API**: Google's Generative AI SDK allows calls directly from the browser.  
-* **The Key**: The user must supply their own Gemini API Key. This should be entered in the "Settings" of the Lalange app and stored in **LocalStorage** (encrypted if possible, though browser storage is inherently accessible to the user).  
-* **CORS**: Browser-based calls to the Gemini API might be blocked by CORS (Cross-Origin Resource Sharing) policies if the origin is not whitelisted or if the API doesn't support direct browser access.29  
-  * *Workaround*: If direct access fails, the Laptop (when running) can act as a proxy. The Phone sends the prompt to the Laptop; the Laptop (running a local Node process or a more permissive browser context) forwards it to Google and returns the response.  
-  * *Prompt Engineering*: The prompt must be "Lacanian." It should not just summarize.  
-    * *System Prompt*: "You are a Lacanian Analyst. Analyze the following text text for the user. Identify the sliding of the signifier, the object a, and the structure of desire. Be cryptic yet illuminating."  
-    * *Context*: The app must send the highlighted text *plus* the surrounding 500 words to provide context to the LLM.
 
 ## ---
 

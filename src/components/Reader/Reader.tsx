@@ -99,7 +99,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         const db = await initDB();
         const doc = await db.reading_states.findOne(book.id).exec();
         if (doc) {
-            await doc.patch({
+            await doc.incrementalPatch({
                 currentChapterId: currentChapter.id,
                 currentWordIndex: indexRef.current,
                 lastRead: Date.now()
@@ -123,7 +123,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             // Update state immediately
             const stateDoc = await db.reading_states.findOne(book.id).exec();
             if (stateDoc) {
-                await stateDoc.patch({
+                await stateDoc.incrementalPatch({
                     currentChapterId: chapterId,
                     currentWordIndex: 0
                 });
