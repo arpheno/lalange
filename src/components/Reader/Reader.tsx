@@ -87,6 +87,13 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         loadState();
     }, [book.id]);
 
+    // Effect to render word when chapter or index changes, ensuring ref is available
+    useEffect(() => {
+        if (!loading && currentChapter && wordsRef.current.length > 0) {
+            renderWord(currentWordIndex, wordsRef.current);
+        }
+    }, [loading, currentChapter, currentWordIndex]);
+
     const saveProgress = async () => {
         if (!readingState || !currentChapter) return;
         const db = await initDB();
@@ -229,8 +236,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                 <div className="w-full flex items-center gap-4">
                     <span className="font-mono text-xs text-gray-500 w-12 text-right">{currentWordIndex}</span>
                     <input
-                        type="range"
-                        min="0"
+                        type="range" aria-label="Progress" min="0"
                         max={wordsRef.current.length - 1}
                         value={currentWordIndex}
                         onChange={handleSliderChange}
@@ -253,8 +259,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     <div className="flex items-center gap-4">
                         <span className="font-mono text-sm text-gray-400">WPM: {wpm}</span>
                         <input
-                            type="range"
-                            min="100"
+                            type="range" aria-label="WPM" min="100"
                             max="1000"
                             step="50"
                             value={wpm}
