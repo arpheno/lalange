@@ -30,6 +30,32 @@ export const bookSchema = {
     required: ['id', 'title']
 } as const;
 
+export const imageSchema = {
+    version: 0,
+    primaryKey: 'id',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+            maxLength: 100
+        },
+        bookId: {
+            type: 'string',
+            maxLength: 100
+        },
+        filename: {
+            type: 'string'
+        },
+        data: {
+            type: 'string' // Base64
+        },
+        mimeType: {
+            type: 'string'
+        }
+    },
+    required: ['id', 'bookId', 'filename', 'data']
+} as const;
+
 export const chapterSchema = {
     version: 0,
     primaryKey: 'id',

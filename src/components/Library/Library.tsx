@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
-import { ingestEpub } from '../../core/ingest/epub';
+import { ingestEpubWithLLM } from '../../core/ingest/pipeline';
 
 interface LibraryProps {
     onOpenBook: (book: BookDocType) => void;
@@ -9,6 +9,7 @@ interface LibraryProps {
 export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     const [books, setBooks] = useState<BookDocType[]>([]);
     const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState('');
 
     useEffect(() => {
         let sub: any;
@@ -27,11 +28,16 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         setLoading(true);
+        setStatus('Starting ingestion...');
         try {
-            const { book, chapters } = await ingestEpub(e.target.files[0]);
+            const { book, chapters, images } = await ingestEpubWithLLM(e.target.files[0], (msg) => setStatus(msg));
             const db = await initDB();
             await db.books.insert(book);
             await db.chapters.bulkInsert(chapters);
+            if (images.length > 0) {
+                await db.images.bulkInsert(images);
+            }
+            
             // Initialize reading state
             await db.reading_states.insert({
                 bookId: book.id,
@@ -40,11 +46,12 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                 lastRead: Date.now(),
                 highlights: []
             });
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            alert('Failed to load book');
+            alert(err.message || 'Failed to load book');
         } finally {
             setLoading(false);
+            setStatus('');
         }
     };
 
@@ -52,16 +59,19 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         <div className="p-8 w-full max-w-4xl">
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-3xl font-mono font-bold">Library</h2>
-                <label className="cursor-pointer bg-white text-black px-4 py-2 font-mono font-bold hover:bg-gray-200 transition-colors">
-                    {loading ? 'Ingesting...' : 'Add EPUB'}
-                    <input
-                        type="file"
-                        accept=".epub"
-                        className="hidden"
-                        onChange={handleFileUpload}
-                        disabled={loading}
-                    />
-                </label>
+                <div className="flex items-center gap-4">
+                    {status && <span className="font-mono text-xs text-yellow-500 animate-pulse">{status}</span>}
+                    <label className="cursor-pointer bg-white text-black px-4 py-2 font-mono font-bold hover:bg-gray-200 transition-colors">
+                        {loading ? 'Processing...' : 'Add EPUB'}
+                        <input
+                            type="file"
+                            accept=".epub"
+                            className="hidden"
+                            onChange={handleFileUpload}
+                            disabled={loading}
+                        />
+                    </label>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

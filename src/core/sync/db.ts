@@ -1,6 +1,6 @@
 import { createRxDatabase, addRxPlugin, type RxDatabase, type RxCollection, type RxStorage } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
-import { bookSchema, chapterSchema, readingStateSchema } from './schema';
+import { bookSchema, chapterSchema, readingStateSchema, imageSchema } from './schema';
 
 // Define types for the database
 export type BookDocType = {
@@ -10,6 +10,14 @@ export type BookDocType = {
     cover?: string;
     totalWords: number;
     chapterIds: string[];
+};
+
+export type ImageDocType = {
+    id: string;
+    bookId: string;
+    filename: string;
+    data: string;
+    mimeType?: string;
 };
 
 export type ChapterDocType = {
@@ -41,11 +49,13 @@ export type ReadingStateDocType = {
 export type BookCollection = RxCollection<BookDocType>;
 export type ChapterCollection = RxCollection<ChapterDocType>;
 export type ReadingStateCollection = RxCollection<ReadingStateDocType>;
+export type ImageCollection = RxCollection<ImageDocType>;
 
 export type MyDatabaseCollections = {
     books: BookCollection;
     chapters: ChapterCollection;
     reading_states: ReadingStateCollection;
+    images: ImageCollection;
 };
 
 export type MyDatabase = RxDatabase<MyDatabaseCollections>;
@@ -84,6 +94,9 @@ export const initDB = async (): Promise<MyDatabase> => {
             },
             reading_states: {
                 schema: readingStateSchema
+            },
+            images: {
+                schema: imageSchema
             }
         });
 
