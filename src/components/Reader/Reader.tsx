@@ -295,17 +295,39 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             if (spans[1]) spans[1].className = "font-light opacity-80";
         }
 
-        // Add new highlight
-        const activeSpan = containerRef.current.querySelector(`[data-index="${idx}"]`);
-        if (activeSpan) {
-            // In "Ghost Mode" (Bionic RSVP active), the flow text highlight is subtle
-            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/5 text-white/50 font-normal rounded px-1 -mx-1 active-word";
-            const spans = activeSpan.querySelectorAll('span');
-            if (spans[0]) spans[0].className = "text-white/50 font-bold";
-            if (spans[1]) spans[1].className = "text-gray-500 font-normal";
+        // Remove old line highlights
+        const prevLines = containerRef.current.querySelectorAll('.active-line-word');
+        prevLines.forEach(el => {
+            el.classList.remove('active-line-word', 'opacity-100', 'text-gray-300');
+            el.classList.add('text-gray-500', 'opacity-20');
+        });
 
-            // Scroll into view
-            activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add new highlight
+        const activeSpan = containerRef.current.querySelector(`[data-index="${idx}"]`) as HTMLElement;
+        if (activeSpan) {
+            // Highlight Active Word
+            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/10 text-white font-normal rounded px-1 -mx-1 active-word";
+            const spans = activeSpan.querySelectorAll('span');
+            if (spans[0]) spans[0].className = "text-white font-bold";
+            if (spans[1]) spans[1].className = "text-gray-400 font-normal";
+
+            // Highlight Current Line
+            const currentTop = activeSpan.offsetTop;
+            const allSpans = containerRef.current.querySelectorAll('.word-span');
+            // We can optimize this by searching nearby, but for now iterate (chunk is small ~200)
+            allSpans.forEach((el) => {
+                if ((el as HTMLElement).offsetTop === currentTop) {
+                    el.classList.add('active-line-word', 'opacity-100', 'text-gray-300');
+                    el.classList.remove('text-gray-500', 'opacity-20');
+                }
+            });
+
+            // Scroll Logic: Position active line at ~40% of container height
+            // Container Height is fixed (h-96 = 384px). 40% is ~150px.
+            // We want scrollTop = activeSpan.offsetTop - 150
+            // Since containerRef is now absolute inside a relative overflow-hidden div, we transform it.
+            const targetY = -(currentTop - 150);
+            containerRef.current.style.transform = `translateY(${targetY}px)`;
         }
 
         // Update RSVP Display
@@ -313,7 +335,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             const currentWord = words[idx];
             if (currentWord) {
                 const { bold, light } = getBionicSplit(currentWord);
-                rsvpRef.current.innerHTML = `<span class="font-bold text-dune-gold">${bold}</span><span class="opacity-80">${light}</span>`;
+                rsvpRef.current.innerHTML = `<span class="font-bold text-white">${bold}</span><span class="opacity-70 text-gray-300">${light}</span>`;
             }
         }
     };
@@ -478,37 +500,44 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
 
                     {/* Reticle / Word Display */}
                     <div
-                        className="relative w-full h-96 flex flex-col items-center justify-center border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
+                        className="relative w-full h-96 flex flex-col items-center justify-start border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
-                        {/* Bionic RSVP Focus Display (Floating) */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none mix-blend-screen">
+                        {/* Zone Indicators (Visual Only) */}
+                        <div className="absolute top-0 h-[40%] w-full bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-20"></div>
+                        <div className="absolute bottom-0 h-[40%] w-full bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-20"></div>
+                        
+                        {/* Bionic RSVP Focus Display (Fixed in Lower Center Zone) */}
+                        <div className="absolute top-[60%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none mix-blend-screen w-full text-center">
                             <div ref={rsvpRef} className="text-6xl md:text-8xl font-mono text-white tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
                                 {wordsRef.current[currentWordIndex] && (() => {
                                     const { bold, light } = getBionicSplit(wordsRef.current[currentWordIndex]);
-                                    return <><span className="font-bold text-dune-gold">{bold}</span><span className="opacity-80">{light}</span></>;
+                                    return <><span className="font-bold text-white">{bold}</span><span className="opacity-70 text-gray-300">{light}</span></>;
                                 })()}
                             </div>
                         </div>
 
                         {/* Scroll Zones */}
                         <div
-                            className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-n-resize"
+                            className="absolute top-0 left-0 right-0 h-12 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-n-resize"
                             onMouseEnter={() => startScrolling('back')}
                             onMouseLeave={stopScrolling}
                         >
                             SCROLL BACK
                         </div>
                         <div
-                            className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-s-resize"
+                            className="absolute bottom-0 left-0 right-0 h-12 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-s-resize"
                             onMouseEnter={() => startScrolling('fwd')}
                             onMouseLeave={stopScrolling}
                         >
                             SCROLL FWD
                         </div>
 
-                        <div ref={containerRef} className="z-10 w-full h-full opacity-30 group-hover:opacity-100 transition-opacity duration-500" onClick={handleRiverClick}></div>
+                        {/* Flow Text Container - Scrollable */}
+                        <div className="w-full h-full overflow-hidden relative">
+                            <div ref={containerRef} className="w-full absolute top-0 left-0 transition-transform duration-300 ease-out" onClick={handleRiverClick}></div>
+                        </div>
                     </div>
 
                     {/* Controls */}
