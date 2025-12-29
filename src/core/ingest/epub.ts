@@ -65,7 +65,9 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
                     bookId: bookId,
                     index: i,
                     title: `Chapter ${i + 1}`, // TODO: Extract real title from TOC
-                    content: words
+                    status: 'pending',
+                    content: words,
+                    densities: []
                 });
                 totalWords += words.length;
             }

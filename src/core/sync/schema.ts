@@ -88,10 +88,20 @@ export const chapterSchema = {
             type: 'number', // WPM
             default: 0
         },
+        lastChunkCompletedAt: {
+            type: 'number', // Timestamp (ms since epoch)
+            default: 0
+        },
         content: {
             type: 'array',
             items: {
                 type: 'string'
+            }
+        },
+        densities: {
+            type: 'array',
+            items: {
+                type: 'number'
             }
         }
     },

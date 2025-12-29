@@ -1,26 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Library } from './components/Library/Library'
 import { Reader } from './components/Reader/Reader'
 import type { BookDocType } from './core/sync/db'
+import { useSettingsStore } from './core/store/settings'
+import { clsx } from 'clsx'
 
 function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
+  const { theme } = useSettingsStore()
+
+  // Apply theme to body
+  useEffect(() => {
+    document.body.className = ''; // Reset
+    if (theme === 'dunes') document.body.classList.add('theme-dunes');
+    if (theme === 'ash') document.body.classList.add('theme-ash');
+    // volcanic is default (no class)
+  }, [theme]);
 
   return (
-    <div className="w-screen h-screen bg-black text-white flex flex-col items-center overflow-hidden">
-      <div className="w-full flex justify-between items-center p-4 border-b border-gray-800">
-        <h1 className="text-xl font-mono font-bold">Lalange</h1>
+    <div className={clsx(
+      "w-screen h-screen flex flex-col items-center overflow-hidden transition-colors duration-700",
+      // Base colors are handled by body/CSS variables, but we can enforce defaults here if needed
+      "bg-basalt text-white"
+    )}>
+      <div className="w-full flex justify-between items-center p-4 border-b border-white/10 bg-black/20 backdrop-blur-sm z-10">
+        <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
         {currentBook && (
           <button
             onClick={() => setCurrentBook(null)}
-            className="font-mono text-sm text-gray-400 hover:text-white"
+            className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
           >
-            Back to Library
+            [ BACK_TO_LIBRARY ]
           </button>
         )}
       </div>
 
-      <div className="flex-1 w-full overflow-auto flex justify-center">
+      <div className="flex-1 w-full overflow-auto flex justify-center relative">
+        {/* Mica Dust Layer */}
+        <div className="mica-dust-layer" />
+
         {currentBook ? (
           <Reader book={currentBook} />
         ) : (

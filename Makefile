@@ -1,6 +1,6 @@
 # Makefile for Lalange Setup
 
-.PHONY: setup install-ollama start-ollama pull-model dev
+.PHONY: setup install-ollama start-ollama pull-model dev test-ollama ollama-test
 
 # Detect OS
 OS := $(shell uname -s)
@@ -36,6 +36,23 @@ start-ollama:
 pull-model: start-ollama
 	@echo "Pulling llama3.1 model..."
 	@ollama pull llama3.1
+
+test-ollama: start-ollama
+	@echo "Waiting for Ollama to become healthy..."
+	@i=0; \
+	until curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1; do \
+		i=$$((i+1)); \
+		if [ $$i -ge 60 ]; then \
+			echo "Ollama did not become ready at http://localhost:11434 within 60s"; \
+			exit 1; \
+		fi; \
+		sleep 1; \
+	done
+	@echo "Running integration tests with Ollama..."
+	@npm run test:ollama
+
+# Backwards-compatible alias
+ollama-test: test-ollama
 
 dev: start-ollama
 	@echo "Starting Vite development server..."

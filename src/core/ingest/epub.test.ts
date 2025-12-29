@@ -86,7 +86,9 @@ describe('ingestEpub', () => {
             bookId: 'test-book-id',
             index: 0,
             title: 'Chapter 1',
-            content: ['This', 'is', 'chapter', 'one.']
+            status: 'pending',
+            content: ['This', 'is', 'chapter', 'one.'],
+            densities: []
         });
 
         expect(result.chapters[1]).toEqual({
@@ -94,7 +96,9 @@ describe('ingestEpub', () => {
             bookId: 'test-book-id',
             index: 1,
             title: 'Chapter 2',
-            content: ['This', 'is', 'chapter', 'two.']
+            status: 'pending',
+            content: ['This', 'is', 'chapter', 'two.'],
+            densities: []
         });
     });
 });

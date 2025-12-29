@@ -23,6 +23,7 @@ describe('Reader Component - Conflict Handling', () => {
         bookId: 'book-conflict',
         index: 0,
         title: 'Chapter 1',
+        status: 'ready',
         content: ['Chapter', 'One', 'Content'],
         toJSON: function () { return this; }
     };
@@ -32,6 +33,7 @@ describe('Reader Component - Conflict Handling', () => {
         bookId: 'book-conflict',
         index: 1,
         title: 'Chapter 2',
+        status: 'ready',
         content: ['Chapter', 'Two', 'Content'],
         toJSON: function () { return this; }
     };
@@ -93,8 +95,23 @@ describe('Reader Component - Conflict Handling', () => {
             findOne: vi.fn().mockImplementation((id) => ({
                 exec: vi.fn().mockResolvedValue(
                     id === 'chapter-1' ? mockChapter1 : mockChapter2
-                )
-            }))
+                ),
+                $: {
+                    subscribe: vi.fn().mockImplementation((callback) => {
+                        callback(id === 'chapter-1' ? mockChapter1 : mockChapter2);
+                        return { unsubscribe: vi.fn() };
+                    })
+                }
+            })),
+            find: vi.fn().mockReturnValue({
+                $: {
+                    subscribe: vi.fn().mockImplementation((callback) => {
+                        callback([mockChapter1, mockChapter2]);
+                        return { unsubscribe: vi.fn() };
+                    })
+                },
+                exec: vi.fn().mockResolvedValue([mockChapter1, mockChapter2])
+            })
         }
     };
 
@@ -116,12 +133,13 @@ describe('Reader Component - Conflict Handling', () => {
         render(<Reader book={mockBook} />);
 
         await waitFor(() => {
-            expect(screen.getByText('Chapter 1')).toBeInTheDocument();
+            const elements = screen.getAllByText('Chapter 1');
+            expect(elements.length).toBeGreaterThan(0);
         });
 
         // Start playing
-        fireEvent.click(screen.getByText('READ'));
-        expect(screen.getByText('PAUSE')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('ENGAGE'));
+        expect(screen.getByText('HALT')).toBeInTheDocument();
 
         // Click Next Chapter while playing
         // This triggers:
@@ -166,7 +184,7 @@ describe('Reader Component - Conflict Handling', () => {
         // To force this interleaving in the test, we can delay the findOne resolution in loadChapter?
         // But findOne is called multiple times.
 
-        const nextButton = screen.getByText('Next Chapter >');
+        const nextButton = screen.getByText('Next Sequence >');
         fireEvent.click(nextButton);
 
         // We expect the chapter to change eventually
@@ -175,6 +193,8 @@ describe('Reader Component - Conflict Handling', () => {
         });
 
         // And we expect the reading state to be updated to Chapter 2
-        expect(dbState.readingState.currentChapterId).toBe('chapter-2');
+        await waitFor(() => {
+            expect(dbState.readingState.currentChapterId).toBe('chapter-2');
+        });
     });
 });

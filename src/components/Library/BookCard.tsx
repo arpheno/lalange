@@ -1,0 +1,142 @@
+import React, { useEffect, useState } from 'react';
+import { initDB, type BookDocType, type ChapterDocType } from '../../core/sync/db';
+import { formatReadingTime } from '../../hooks/useReadingTimeEstimate';
+
+interface BookCardProps {
+    book: BookDocType;
+    onOpen: () => void;
+    onDelete: (e: React.MouseEvent) => void;
+}
+
+export const BookCard: React.FC<BookCardProps> = ({ book, onOpen, onDelete }) => {
+    const [chapters, setChapters] = useState<ChapterDocType[]>([]);
+    const [readingTime, setReadingTime] = useState<string>('');
+    const [processingStatus, setProcessingStatus] = useState<string>('');
+
+    useEffect(() => {
+        let sub: any;
+        const setup = async () => {
+            const db = await initDB();
+            sub = db.chapters.find({
+                selector: { bookId: book.id },
+                sort: [{ index: 'asc' }]
+            }).$.subscribe(docs => {
+                setChapters(docs.map(d => d.toJSON() as ChapterDocType));
+            });
+        };
+        setup();
+        return () => {
+            if (sub) sub.unsubscribe();
+        };
+    }, [book.id]);
+
+    useEffect(() => {
+        const calculateReadingTime = () => {
+            const USER_WPM = 300; // Default reading speed
+
+            // Separate finished and processing chapters
+            const finishedChapters = chapters.filter(c => c.status === 'ready');
+            const processingChapters = chapters.filter(c => c.status === 'processing');
+
+            // Calculate total words from finished chapters
+            let totalWords = 0;
+            finishedChapters.forEach(ch => {
+                totalWords += ch.content.length;
+            });
+
+            // For processing chapters, use linear projection
+            let estimatedProcessingWords = 0;
+            processingChapters.forEach(ch => {
+                const reportedWords = ch.content.length;
+                const speed = ch.processingSpeed || 0;
+                const lastChunkTime = ch.lastChunkCompletedAt || 0;
+
+                if (speed > 0 && lastChunkTime > 0) {
+                    const now = Date.now();
+                    const timeSinceLastChunk = (now - lastChunkTime) / 60000; // minutes
+                    const projectedNewWords = Math.floor(speed * timeSinceLastChunk);
+                    estimatedProcessingWords += reportedWords + projectedNewWords;
+                } else {
+                    estimatedProcessingWords += reportedWords;
+                }
+            });
+
+            const totalAvailableWords = totalWords + estimatedProcessingWords;
+            const totalMinutes = totalAvailableWords / USER_WPM;
+
+            if (processingChapters.length > 0) {
+                const avgSpeed = processingChapters.reduce((sum, ch) => sum + (ch.processingSpeed || 0), 0) / processingChapters.length;
+                setReadingTime(formatReadingTime(totalMinutes));
+                setProcessingStatus(` • ${Math.round(avgSpeed)} WPM ingest`);
+            } else if (finishedChapters.length > 0) {
+                setReadingTime(formatReadingTime(totalMinutes));
+                setProcessingStatus('');
+            } else {
+                setReadingTime('Processing...');
+                setProcessingStatus('');
+            }
+        };
+
+        calculateReadingTime();
+
+        // Update every second if there are processing chapters
+        const hasProcessing = chapters.some(c => c.status === 'processing');
+        if (hasProcessing) {
+            const interval = setInterval(calculateReadingTime, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [chapters]);
+
+    return (
+        <div
+            onClick={onOpen}
+            className="cursor-pointer group relative bg-white/5 border border-white/10 hover:border-dune-gold transition-all duration-300 p-4 flex flex-col h-full"
+        >
+            <button
+                onClick={onDelete}
+                className="absolute top-2 right-2 z-10 text-gray-500 hover:text-magma-vent opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Delete Book"
+            >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <div className="aspect-[2/3] bg-black/20 mb-4 overflow-hidden border border-white/5 relative">
+                {book.cover ? (
+                    <img src={book.cover} alt={book.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" />
+                ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-gray-600 font-mono text-xs p-4 text-center border-2 border-dashed border-white/5">
+                        <span className="mb-2 text-2xl opacity-20">EPUB</span>
+                        NO COVER
+                    </div>
+                )}
+
+                {/* Progress Overlay */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+                    <div className="h-full bg-dune-gold" style={{ width: '0%' }}></div>
+                </div>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-between gap-2">
+                <div>
+                    <h3 className="font-mono text-sm font-bold text-gray-200 group-hover:text-dune-gold transition-colors line-clamp-2 leading-tight mb-1">
+                        {book.title}
+                    </h3>
+                    <p className="font-mono text-xs text-gray-500 truncate uppercase tracking-wider">
+                        {book.author || 'UNKNOWN AUTHOR'}
+                    </p>
+                </div>
+
+                <div className="pt-3 border-t border-white/5 flex justify-between items-center">
+                    <div className="font-mono text-[10px] text-canarian-pine uppercase tracking-wider">
+                        {readingTime || 'CALCULATING...'}
+                    </div>
+                    {processingStatus && (
+                        <div className="w-2 h-2 bg-magma-vent rounded-full animate-pulse" title={processingStatus}></div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};

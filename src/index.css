@@ -3,13 +3,131 @@
 @tailwind utilities;
 
 :root {
+  /* --- BIOME: THE MASPALOMAS DUNES (Daymode) --- */
+  --color-dune-gold: #E0D058;
+  --color-dune-shadow: #C47610;
+  --color-calima-haze: #DCBCA3;
+  --color-atlantic-blue: #3399FF;
+
+  /* --- BIOME: THE VOLCANIC INTERIOR (Nightmode) --- */
+  --color-basalt: #111111;
+  --color-magma-vent: #CF1020;
+  --color-magma-crust: #EB5121;
+  --color-canarian-pine: #01796F;
+
+  /* --- BIOME: YUMBO NIGHTLIFE (LSD/Psychedelic) --- */
+  --color-neon-pride: #FF01D7;
+  --color-bio-cyan: #00EDF5;
+  --color-mojo-lime: #F7F002;
+
+  /* --- MATERIAL: MICA & GOLD DUST --- */
+  --gradient-mica: linear-gradient(135deg, #C47610, #E0D058, #A5663A, #FFF, #C47610);
+
+  /* --- OPTICS: CALIMA GLASS --- */
+  --glass-blur: 25px;
+  --glass-tint: rgba(220, 188, 163, 0.05);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.15);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+  /* --- KINETICS: THE TRADE WINDS (ALISIOS) --- */
+  --ease-swell: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --anim-breath: 6000ms;
+
+  /* Default Font */
   font-family: 'Roboto Mono', monospace;
-  background-color: #000000;
-  color: #ffffff;
 }
 
 body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background-color: var(--color-basalt);
+  color: #ffffff;
+  transition: background-color 0.8s var(--ease-swell), color 0.5s ease;
+}
+
+/* --- THEME MODES --- */
+
+/* Daymode: Dunes */
+body.theme-dunes {
+  background-color: var(--color-dune-gold);
+  color: var(--color-basalt);
+  --glass-tint: rgba(255, 255, 255, 0.2);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 10px 40px rgba(196, 118, 16, 0.3);
+}
+
+/* Grayscale: Ash */
+body.theme-ash {
+  background-color: #2F3742;
+  filter: grayscale(100%) contrast(1.1);
+}
+
+/* --- COMPONENTS --- */
+
+@layer components {
+  .calima-glass {
+    background: var(--glass-tint);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .btn-magma {
+    @apply relative px-14 py-5 rounded-full border-none text-white font-extrabold uppercase tracking-widest cursor-pointer overflow-hidden;
+    background: var(--color-magma-vent);
+    will-change: transform, box-shadow;
+    animation: magmaBreath var(--anim-breath) var(--ease-swell) infinite;
+  }
+
+  .btn-magma::after {
+    content: "";
+    @apply absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-white/60 rounded-full opacity-0 transform -translate-x-1/2 -translate-y-1/2 scale-0 transition-all duration-0;
+  }
+
+  .btn-magma:active::after {
+    @apply scale-[20] opacity-0 transition-all duration-600 ease-out;
+  }
+
+  .mica-dust-layer {
+    @apply absolute top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-40 mix-blend-overlay;
+    background: var(--gradient-mica);
+    mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    animation: alisiosWind 40s linear infinite;
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-mica);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* --- ANIMATIONS --- */
+
+@keyframes alisiosWind {
+  0% {
+    background-position: 0% 0%;
+  }
+
+  100% {
+    background-position: 100% 20%;
+  }
+}
+
+@keyframes magmaBreath {
+
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px var(--color-magma-crust);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 30px var(--color-magma-vent);
+  }
 }

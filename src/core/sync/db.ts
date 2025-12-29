@@ -33,7 +33,9 @@ export type ChapterDocType = {
     status: 'pending' | 'processing' | 'ready' | 'error';
     progress?: number;
     processingSpeed?: number;
+    lastChunkCompletedAt?: number;
     content: string[];
+    densities?: number[];
 };
 
 export type HighlightType = {
@@ -90,7 +92,7 @@ export const initDB = async (): Promise<MyDatabase> => {
         }
 
         const db = await createRxDatabase<MyDatabaseCollections>({
-            name: 'lalange_db_v4', // Bumped version/name to force fresh DB
+            name: 'lalange_db_v7', // Bumped version/name to force fresh DB
             storage,
             ignoreDuplicate: true
         });

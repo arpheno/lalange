@@ -24,6 +24,7 @@ describe('Reader Component', () => {
         bookId: 'book-1',
         index: 0,
         title: 'Chapter 1',
+        status: 'ready',
         content: ['Hello', 'world', 'this', 'is', 'a', 'test'],
         toJSON: function () { return this; }
     };
@@ -33,6 +34,7 @@ describe('Reader Component', () => {
         bookId: 'book-1',
         index: 1,
         title: 'Chapter 2',
+        status: 'ready',
         content: ['Second', 'chapter', 'content'],
         toJSON: function () { return this; }
     };
@@ -44,7 +46,8 @@ describe('Reader Component', () => {
         lastRead: Date.now(),
         highlights: [],
         toJSON: function () { return this; },
-        patch: vi.fn()
+        patch: vi.fn(),
+        incrementalPatch: vi.fn()
     };
 
     const mockDb = {
@@ -58,8 +61,23 @@ describe('Reader Component', () => {
             findOne: vi.fn().mockImplementation((id) => ({
                 exec: vi.fn().mockResolvedValue(
                     id === 'chapter-1' ? mockChapter1 : mockChapter2
-                )
-            }))
+                ),
+                $: {
+                    subscribe: vi.fn().mockImplementation((callback) => {
+                        callback(id === 'chapter-1' ? mockChapter1 : mockChapter2);
+                        return { unsubscribe: vi.fn() };
+                    })
+                }
+            })),
+            find: vi.fn().mockReturnValue({
+                $: {
+                    subscribe: vi.fn().mockImplementation((callback) => {
+                        callback([mockChapter1, mockChapter2]);
+                        return { unsubscribe: vi.fn() };
+                    })
+                },
+                exec: vi.fn().mockResolvedValue([mockChapter1, mockChapter2])
+            })
         }
     };
 
@@ -70,77 +88,82 @@ describe('Reader Component', () => {
 
     it('should render loading state initially', () => {
         render(<Reader book={mockBook} />);
-        expect(screen.getByText('Loading...')).toBeInTheDocument();
+        expect(screen.getByText('INITIALIZING COCKPIT...')).toBeInTheDocument();
     });
 
     it('should load and display the first word', async () => {
         render(<Reader book={mockBook} />);
 
         await waitFor(() => {
-            expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+            expect(screen.queryByText('INITIALIZING COCKPIT...')).not.toBeInTheDocument();
         });
 
-        // The word "Hello" should be split. ORP for "Hello" (len 5) is 1 (index 1, 'e').
-        // Left: "H", Center: "e", Right: "llo"
-        expect(screen.getByText('H')).toBeInTheDocument();
-        expect(screen.getByText('e')).toBeInTheDocument();
+        // The word "Hello" should be split. Bionic for "Hello" (len 5) is 2 bold.
+        // Bold: "He", Light: "llo"
+        expect(screen.getByText('He')).toBeInTheDocument();
         expect(screen.getByText('llo')).toBeInTheDocument();
     });
 
     it('should display chapter title', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('Chapter 1')).toBeInTheDocument();
+            // There might be multiple "Chapter 1" (sidebar and main view)
+            const elements = screen.getAllByText('Chapter 1');
+            expect(elements.length).toBeGreaterThan(0);
         });
     });
 
     it('should toggle play/pause', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('READ')).toBeInTheDocument();
+            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByText('READ'));
-        expect(screen.getByText('PAUSE')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('ENGAGE'));
+        expect(screen.getByText('HALT')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByText('PAUSE'));
-        expect(screen.getByText('READ')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('HALT'));
+        expect(screen.getByText('ENGAGE')).toBeInTheDocument();
     });
 
     it('should navigate to next chapter', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('Chapter 1')).toBeInTheDocument();
+            const elements = screen.getAllByText('Chapter 1');
+            expect(elements.length).toBeGreaterThan(0);
         });
 
-        const nextButton = screen.getByText('Next Chapter >');
-        fireEvent.click(nextButton);
+        const nextButtons = screen.getAllByText('Next Sequence >');
+        fireEvent.click(nextButtons[0]);
 
         await waitFor(() => {
-            expect(screen.getByText('Chapter 2')).toBeInTheDocument();
+            const elements = screen.getAllByText('Chapter 2');
+            expect(elements.length).toBeGreaterThan(0);
         });
 
-        // Check if content updated to "Second" (ORP index 2 for length 6 -> 'c')
-        // "Second" -> len 6 -> ORP 2 ('c') -> Left "Se", Center "c", Right "ond"
-        expect(screen.getByText('Se')).toBeInTheDocument();
-        expect(screen.getByText('c')).toBeInTheDocument();
+        // Check if content updated to "Second" (Bionic for "Second" len 6 -> 3 bold)
+        // "Second" -> len 6 -> Bold "Sec", Light "ond"
+        expect(screen.getByText('Sec')).toBeInTheDocument();
         expect(screen.getByText('ond')).toBeInTheDocument();
     });
 
     it('should save progress when pausing', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('READ')).toBeInTheDocument();
+            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
         });
 
         // Start reading
-        fireEvent.click(screen.getByText('READ'));
+        fireEvent.click(screen.getByText('ENGAGE'));
 
         // Simulate some time passing or manual slider change
         // Since we can't easily wait for requestAnimationFrame in this setup without fake timers,
         // let's use the slider to change position while paused, then check save.
 
-        fireEvent.click(screen.getByText('PAUSE'));
+        fireEvent.click(screen.getByText('HALT'));
+        await waitFor(() => {
+            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
+        });
 
         // Change slider
         const progressSlider = screen.getByRole('slider', { name: 'Progress' });
@@ -149,7 +172,7 @@ describe('Reader Component', () => {
 
         // Changing slider calls saveProgress if not playing
         await waitFor(() => {
-            expect(mockReadingState.patch).toHaveBeenCalledWith(expect.objectContaining({
+            expect(mockReadingState.incrementalPatch).toHaveBeenCalledWith(expect.objectContaining({
                 currentWordIndex: 2
             }));
         });
