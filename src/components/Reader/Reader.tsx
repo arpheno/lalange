@@ -26,6 +26,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     const [, setTick] = useState(0); // Force re-render for live time updates
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const rsvpRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<number | undefined>(undefined);
     const lastTimeRef = useRef<number | undefined>(undefined);
     const accumulatorRef = useRef<number>(0);
@@ -223,12 +224,12 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
 
     const startScrolling = (direction: 'back' | 'fwd') => {
         if (scrollIntervalRef.current) return;
-        
+
         scrollIntervalRef.current = setInterval(() => {
-            const newIndex = direction === 'back' 
-                ? Math.max(0, indexRef.current - 5) 
+            const newIndex = direction === 'back'
+                ? Math.max(0, indexRef.current - 5)
                 : Math.min(wordsRef.current.length - 1, indexRef.current + 5);
-            
+
             if (newIndex !== indexRef.current) {
                 indexRef.current = newIndex;
                 setCurrentWordIndex(newIndex);
@@ -274,7 +275,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     </span>
                 `;
             }).join('');
-            
+
             containerRef.current.innerHTML = `
                 <div class="w-full flex flex-wrap content-start justify-start p-8 font-mono text-xl md:text-2xl leading-relaxed select-none">
                     ${html}
@@ -297,13 +298,23 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         // Add new highlight
         const activeSpan = containerRef.current.querySelector(`[data-index="${idx}"]`);
         if (activeSpan) {
-            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/10 text-white font-bold rounded px-1 -mx-1 active-word opacity-100 scale-105 shadow-lg shadow-magma-vent/20";
+            // In "Ghost Mode" (Bionic RSVP active), the flow text highlight is subtle
+            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/5 text-white/50 font-normal rounded px-1 -mx-1 active-word";
             const spans = activeSpan.querySelectorAll('span');
-            if (spans[0]) spans[0].className = "text-white font-bold";
-            if (spans[1]) spans[1].className = "text-gray-300 font-normal";
+            if (spans[0]) spans[0].className = "text-white/50 font-bold";
+            if (spans[1]) spans[1].className = "text-gray-500 font-normal";
 
             // Scroll into view
             activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Update RSVP Display
+        if (rsvpRef.current) {
+            const currentWord = words[idx];
+            if (currentWord) {
+                const { bold, light } = getBionicSplit(currentWord);
+                rsvpRef.current.innerHTML = `<span class="font-bold text-dune-gold">${bold}</span><span class="opacity-80">${light}</span>`;
+            }
         }
     };
 
@@ -467,19 +478,29 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
 
                     {/* Reticle / Word Display */}
                     <div
-                        className="relative w-full h-96 flex items-center justify-center border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
+                        className="relative w-full h-96 flex flex-col items-center justify-center border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
                         onMouseEnter={handleMouseEnter}
                         onMouseLeave={handleMouseLeave}
                     >
+                        {/* Bionic RSVP Focus Display (Floating) */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none mix-blend-screen">
+                            <div ref={rsvpRef} className="text-6xl md:text-8xl font-mono text-white tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                                {wordsRef.current[currentWordIndex] && (() => {
+                                    const { bold, light } = getBionicSplit(wordsRef.current[currentWordIndex]);
+                                    return <><span className="font-bold text-dune-gold">{bold}</span><span className="opacity-80">{light}</span></>;
+                                })()}
+                            </div>
+                        </div>
+
                         {/* Scroll Zones */}
-                        <div 
+                        <div
                             className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-n-resize"
                             onMouseEnter={() => startScrolling('back')}
                             onMouseLeave={stopScrolling}
                         >
                             SCROLL BACK
                         </div>
-                        <div 
+                        <div
                             className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-s-resize"
                             onMouseEnter={() => startScrolling('fwd')}
                             onMouseLeave={stopScrolling}
@@ -487,7 +508,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                             SCROLL FWD
                         </div>
 
-                        <div ref={containerRef} className="z-10 w-full h-full" onClick={handleRiverClick}></div>
+                        <div ref={containerRef} className="z-10 w-full h-full opacity-30 group-hover:opacity-100 transition-opacity duration-500" onClick={handleRiverClick}></div>
                     </div>
 
                     {/* Controls */}

@@ -100,8 +100,9 @@ describe('Reader Component', () => {
 
         // The word "Hello" should be split. Bionic for "Hello" (len 5) is 2 bold.
         // Bold: "He", Light: "llo"
-        expect(screen.getByText('He')).toBeInTheDocument();
-        expect(screen.getByText('llo')).toBeInTheDocument();
+        // We expect multiple because of the Flow view AND the RSVP view
+        expect(screen.getAllByText('He').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('llo').length).toBeGreaterThan(0);
     });
 
     it('should display chapter title', async () => {
@@ -121,18 +122,23 @@ describe('Reader Component', () => {
 
         // Click the first word (index 0) to toggle play
         // "Hello" -> "He" + "llo"
-        const wordPart = screen.getByText('He');
-        // The structure is span.word-span > span > "He"
-        // We need to click the outer span which has the click handler
-        const wordSpan = wordPart.closest('.word-span');
-        expect(wordSpan).toBeInTheDocument();
+        const wordParts = screen.getAllByText('He');
+        // We want the one in the flow view, which has the click handler
+        // The flow view spans have class "word-span"
+        const wordPart = wordParts.find(el => el.closest('.word-span'));
+        expect(wordPart).toBeDefined();
         
-        if (wordSpan) {
-            fireEvent.click(wordSpan);
-            expect(screen.getByText('READING...')).toBeInTheDocument();
+        if (wordPart) {
+            const wordSpan = wordPart.closest('.word-span');
+            expect(wordSpan).toBeInTheDocument();
 
-            fireEvent.click(wordSpan);
-            expect(screen.getByText('PAUSED')).toBeInTheDocument();
+            if (wordSpan) {
+                fireEvent.click(wordSpan);
+                expect(screen.getByText('READING...')).toBeInTheDocument();
+
+                fireEvent.click(wordSpan);
+                expect(screen.getByText('PAUSED')).toBeInTheDocument();
+            }
         }
     });
 
@@ -153,8 +159,8 @@ describe('Reader Component', () => {
 
         // Check if content updated to "Second" (Bionic for "Second" len 6 -> 3 bold)
         // "Second" -> len 6 -> Bold "Sec", Light "ond"
-        expect(screen.getByText('Sec')).toBeInTheDocument();
-        expect(screen.getByText('ond')).toBeInTheDocument();
+        expect(screen.getAllByText('Sec').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('ond').length).toBeGreaterThan(0);
     });
 
     it('should save progress when pausing', async () => {
