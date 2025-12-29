@@ -116,14 +116,24 @@ describe('Reader Component', () => {
     it('should toggle play/pause', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
+            expect(screen.getByText('PAUSED')).toBeInTheDocument();
         });
 
-        fireEvent.click(screen.getByText('ENGAGE'));
-        expect(screen.getByText('HALT')).toBeInTheDocument();
+        // Click the first word (index 0) to toggle play
+        // "Hello" -> "He" + "llo"
+        const wordPart = screen.getByText('He');
+        // The structure is span.word-span > span > "He"
+        // We need to click the outer span which has the click handler
+        const wordSpan = wordPart.closest('.word-span');
+        expect(wordSpan).toBeInTheDocument();
+        
+        if (wordSpan) {
+            fireEvent.click(wordSpan);
+            expect(screen.getByText('READING...')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByText('HALT'));
-        expect(screen.getByText('ENGAGE')).toBeInTheDocument();
+            fireEvent.click(wordSpan);
+            expect(screen.getByText('PAUSED')).toBeInTheDocument();
+        }
     });
 
     it('should navigate to next chapter', async () => {
@@ -150,19 +160,7 @@ describe('Reader Component', () => {
     it('should save progress when pausing', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
-        });
-
-        // Start reading
-        fireEvent.click(screen.getByText('ENGAGE'));
-
-        // Simulate some time passing or manual slider change
-        // Since we can't easily wait for requestAnimationFrame in this setup without fake timers,
-        // let's use the slider to change position while paused, then check save.
-
-        fireEvent.click(screen.getByText('HALT'));
-        await waitFor(() => {
-            expect(screen.getByText('ENGAGE')).toBeInTheDocument();
+            expect(screen.getByText('PAUSED')).toBeInTheDocument();
         });
 
         // Change slider

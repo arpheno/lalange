@@ -34,6 +34,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     const indexRef = useRef(0);
     const wpmRef = useRef(wpm);
     const isPlayingRef = useRef(isPlaying);
+    const wasPlayingRef = useRef(false);
     const wordsRef = useRef<string[]>([]);
     const densitiesRef = useRef<number[]>([]);
 
@@ -216,60 +217,135 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         }
     };
 
+    const scrollIntervalRef = useRef<any>(null);
+    const chunkStartRef = useRef<number>(-1);
+    const chunkEndRef = useRef<number>(-1);
+
+    const startScrolling = (direction: 'back' | 'fwd') => {
+        if (scrollIntervalRef.current) return;
+        
+        scrollIntervalRef.current = setInterval(() => {
+            const newIndex = direction === 'back' 
+                ? Math.max(0, indexRef.current - 5) 
+                : Math.min(wordsRef.current.length - 1, indexRef.current + 5);
+            
+            if (newIndex !== indexRef.current) {
+                indexRef.current = newIndex;
+                setCurrentWordIndex(newIndex);
+                renderWord(newIndex, wordsRef.current);
+            }
+        }, 100);
+    };
+
+    const stopScrolling = () => {
+        if (scrollIntervalRef.current) {
+            clearInterval(scrollIntervalRef.current);
+            scrollIntervalRef.current = null;
+        }
+    };
+
     const renderWord = (idx: number, words: string[]) => {
         if (!containerRef.current || idx >= words.length) return;
-        const word = words[idx];
-        const { bold, light } = getBionicSplit(word);
 
-        // River Context
-        const PREV_COUNT = 10;
-        const NEXT_COUNT = 10;
+        const CHUNK_SIZE = 200;
+        const BUFFER = 50;
 
-        const prevWords = words.slice(Math.max(0, idx - PREV_COUNT), idx);
-        const nextWords = words.slice(idx + 1, idx + 1 + NEXT_COUNT);
+        // Check if we need to re-render the chunk
+        let needsRender = false;
+        if (idx < chunkStartRef.current + BUFFER || idx > chunkEndRef.current - BUFFER) {
+            // Recalculate chunk
+            chunkStartRef.current = Math.max(0, idx - CHUNK_SIZE / 2);
+            chunkEndRef.current = Math.min(words.length, chunkStartRef.current + CHUNK_SIZE);
+            needsRender = true;
+        }
 
-        const prevHtml = prevWords.map((w, i) => {
-            const actualIndex = Math.max(0, idx - PREV_COUNT) + i;
-            const opacity = (i + 1) / PREV_COUNT * 0.5; // Fade in
-            return `<span class="text-gray-500 mx-1 cursor-pointer hover:text-white transition-colors" style="opacity: ${opacity}" data-index="${actualIndex}">${w}</span>`;
-        }).join('');
-
-        const nextHtml = nextWords.map((w, i) => {
-            const actualIndex = idx + 1 + i;
-            const opacity = (NEXT_COUNT - i) / NEXT_COUNT * 0.5; // Fade out
-            return `<span class="text-gray-500 mx-1 cursor-pointer hover:text-white transition-colors" style="opacity: ${opacity}" data-index="${actualIndex}">${w}</span>`;
-        }).join('');
-
-        containerRef.current.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full">
-                <div class="text-lg md:text-xl text-center mb-8 max-w-2xl leading-relaxed h-24 overflow-hidden flex items-end justify-center flex-wrap content-end">
-                    ${prevHtml}
+        if (needsRender || containerRef.current.children.length === 0) {
+            const visibleWords = words.slice(chunkStartRef.current, chunkEndRef.current);
+            const html = visibleWords.map((w, i) => {
+                const actualIndex = chunkStartRef.current + i;
+                const { bold, light } = getBionicSplit(w);
+                return `
+                    <span 
+                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-20 group-hover:opacity-50 hover:!opacity-100 hover:text-white"
+                        data-index="${actualIndex}"
+                        id="word-${actualIndex}"
+                    >
+                        <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
+                    </span>
+                `;
+            }).join('');
+            
+            containerRef.current.innerHTML = `
+                <div class="w-full flex flex-wrap content-start justify-start p-8 font-mono text-xl md:text-2xl leading-relaxed select-none">
+                    ${html}
                 </div>
-                
-                <div class="flex items-center justify-center text-4xl md:text-6xl font-mono tracking-wide py-4">
-                    <span class="text-white font-bold">${bold}</span>
-                    <span class="text-gray-400 font-normal opacity-80">${light}</span>
-                </div>
+            `;
+        }
 
-                <div class="text-lg md:text-xl text-center mt-8 max-w-2xl leading-relaxed h-24 overflow-hidden flex items-start justify-center flex-wrap content-start">
-                    ${nextHtml}
-                </div>
-            </div>
-        `;
+        // Update Highlights (DOM manipulation)
+        // Remove old highlights
+        const prevActive = containerRef.current.querySelector('.active-word');
+        if (prevActive) {
+            prevActive.className = "word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-20 group-hover:opacity-50 hover:!opacity-100 hover:text-white";
+            prevActive.classList.remove('active-word');
+            // Reset inner colors
+            const spans = prevActive.querySelectorAll('span');
+            if (spans[0]) spans[0].className = "font-bold";
+            if (spans[1]) spans[1].className = "font-light opacity-80";
+        }
+
+        // Add new highlight
+        const activeSpan = containerRef.current.querySelector(`[data-index="${idx}"]`);
+        if (activeSpan) {
+            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/10 text-white font-bold rounded px-1 -mx-1 active-word opacity-100 scale-105 shadow-lg shadow-magma-vent/20";
+            const spans = activeSpan.querySelectorAll('span');
+            if (spans[0]) spans[0].className = "text-white font-bold";
+            if (spans[1]) spans[1].className = "text-gray-300 font-normal";
+
+            // Scroll into view
+            activeSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     };
 
     const handleRiverClick = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        const indexStr = target.getAttribute('data-index');
-        if (indexStr) {
-            const newIndex = parseInt(indexStr, 10);
-            if (!isNaN(newIndex)) {
-                setIsPlaying(false);
-                indexRef.current = newIndex;
-                setCurrentWordIndex(newIndex);
-                renderWord(newIndex, wordsRef.current);
-                saveProgress();
+        // Check if clicked on a word span or its children
+        const wordSpan = target.closest('[data-index]');
+        if (wordSpan) {
+            const indexStr = wordSpan.getAttribute('data-index');
+            if (indexStr) {
+                const newIndex = parseInt(indexStr, 10);
+                if (!isNaN(newIndex)) {
+                    // If clicking the current word, toggle play/pause
+                    if (newIndex === indexRef.current) {
+                        setIsPlaying(!isPlayingRef.current);
+                    } else {
+                        // Jump to new word and pause (or keep playing? User said "click to play/pause" on playing word)
+                        // "Resume: User clicks the word where they left off."
+                        setIsPlaying(true);
+                        indexRef.current = newIndex;
+                        setCurrentWordIndex(newIndex);
+                        renderWord(newIndex, wordsRef.current);
+                    }
+                    saveProgress();
+                }
             }
+        }
+    };
+
+    const handleMouseEnter = () => {
+        if (isPlayingRef.current) {
+            wasPlayingRef.current = true;
+            setIsPlaying(false);
+        } else {
+            wasPlayingRef.current = false;
+        }
+    };
+
+    const handleMouseLeave = () => {
+        if (wasPlayingRef.current) {
+            setIsPlaying(true);
+            wasPlayingRef.current = false;
         }
     };
 
@@ -390,9 +466,27 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     </div>
 
                     {/* Reticle / Word Display */}
-                    <div className="relative w-full h-64 flex items-center justify-center border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm">
-                        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-magma-vent/30 transform -translate-x-1/2"></div>
-                        <div className="absolute left-0 right-0 top-1/2 h-px bg-magma-vent/30 transform -translate-y-1/2"></div>
+                    <div
+                        className="relative w-full h-96 flex items-center justify-center border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
+                        onMouseEnter={handleMouseEnter}
+                        onMouseLeave={handleMouseLeave}
+                    >
+                        {/* Scroll Zones */}
+                        <div 
+                            className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-n-resize"
+                            onMouseEnter={() => startScrolling('back')}
+                            onMouseLeave={stopScrolling}
+                        >
+                            SCROLL BACK
+                        </div>
+                        <div 
+                            className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-magma-vent/20 to-transparent z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-s-resize"
+                            onMouseEnter={() => startScrolling('fwd')}
+                            onMouseLeave={stopScrolling}
+                        >
+                            SCROLL FWD
+                        </div>
+
                         <div ref={containerRef} className="z-10 w-full h-full" onClick={handleRiverClick}></div>
                     </div>
 
@@ -411,18 +505,13 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                             <span className="font-mono text-xs text-gray-500 w-12">{wordsRef.current.length}</span>
                         </div>
 
-                        {/* Play/Pause & WPM */}
+                        {/* Minimal Controls */}
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setIsPlaying(!isPlaying)}
-                                    className={`px-10 py-4 font-mono font-bold tracking-widest transition-all rounded-sm ${isPlaying
-                                        ? 'bg-magma-vent text-white shadow-[0_0_20px_rgba(207,16,32,0.4)]'
-                                        : 'bg-dune-gold text-black hover:bg-white'
-                                        }`}
-                                >
-                                    {isPlaying ? 'HALT' : 'ENGAGE'}
-                                </button>
+                                {/* Removed Engage Button */}
+                                <span className="font-mono text-xs text-gray-500 uppercase tracking-wider">
+                                    {isPlaying ? 'READING...' : 'PAUSED'}
+                                </span>
                             </div>
 
                             <div className="flex items-center gap-4">
