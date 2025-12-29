@@ -22,10 +22,13 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     // Sidebar & Chapters
     const [chapters, setChapters] = useState<ChapterDocType[]>([]);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
     const [, setTick] = useState(0); // Force re-render for live time updates
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const prevContainerRef = useRef<HTMLDivElement>(null);
+    const nextContainerRef = useRef<HTMLDivElement>(null);
     const rsvpRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<number | undefined>(undefined);
     const lastTimeRef = useRef<number | undefined>(undefined);
@@ -246,90 +249,6 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     };
 
     const renderWord = (idx: number, words: string[]) => {
-        if (!containerRef.current || idx >= words.length) return;
-
-        const CHUNK_SIZE = 200;
-        const BUFFER = 50;
-
-        // Check if we need to re-render the chunk
-        let needsRender = false;
-        if (idx < chunkStartRef.current + BUFFER || idx > chunkEndRef.current - BUFFER) {
-            // Recalculate chunk
-            chunkStartRef.current = Math.max(0, idx - CHUNK_SIZE / 2);
-            chunkEndRef.current = Math.min(words.length, chunkStartRef.current + CHUNK_SIZE);
-            needsRender = true;
-        }
-
-        if (needsRender || containerRef.current.children.length === 0) {
-            const visibleWords = words.slice(chunkStartRef.current, chunkEndRef.current);
-            const html = visibleWords.map((w, i) => {
-                const actualIndex = chunkStartRef.current + i;
-                const { bold, light } = getBionicSplit(w);
-                return `
-                    <span 
-                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-20 group-hover:opacity-50 hover:!opacity-100 hover:text-white"
-                        data-index="${actualIndex}"
-                        id="word-${actualIndex}"
-                    >
-                        <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
-                    </span>
-                `;
-            }).join('');
-
-            containerRef.current.innerHTML = `
-                <div class="w-full flex flex-wrap content-start justify-start p-8 font-mono text-xl md:text-2xl leading-relaxed select-none">
-                    ${html}
-                </div>
-            `;
-        }
-
-        // Update Highlights (DOM manipulation)
-        // Remove old highlights
-        const prevActive = containerRef.current.querySelector('.active-word');
-        if (prevActive) {
-            prevActive.className = "word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-20 group-hover:opacity-50 hover:!opacity-100 hover:text-white";
-            prevActive.classList.remove('active-word');
-            // Reset inner colors
-            const spans = prevActive.querySelectorAll('span');
-            if (spans[0]) spans[0].className = "font-bold";
-            if (spans[1]) spans[1].className = "font-light opacity-80";
-        }
-
-        // Remove old line highlights
-        const prevLines = containerRef.current.querySelectorAll('.active-line-word');
-        prevLines.forEach(el => {
-            el.classList.remove('active-line-word', 'opacity-100', 'text-gray-300');
-            el.classList.add('text-gray-500', 'opacity-20');
-        });
-
-        // Add new highlight
-        const activeSpan = containerRef.current.querySelector(`[data-index="${idx}"]`) as HTMLElement;
-        if (activeSpan) {
-            // Highlight Active Word
-            activeSpan.className = "word-span inline-block mr-2 mb-2 transition-all duration-100 cursor-pointer bg-white/10 text-white font-normal rounded px-1 -mx-1 active-word";
-            const spans = activeSpan.querySelectorAll('span');
-            if (spans[0]) spans[0].className = "text-white font-bold";
-            if (spans[1]) spans[1].className = "text-gray-400 font-normal";
-
-            // Highlight Current Line
-            const currentTop = activeSpan.offsetTop;
-            const allSpans = containerRef.current.querySelectorAll('.word-span');
-            // We can optimize this by searching nearby, but for now iterate (chunk is small ~200)
-            allSpans.forEach((el) => {
-                if ((el as HTMLElement).offsetTop === currentTop) {
-                    el.classList.add('active-line-word', 'opacity-100', 'text-gray-300');
-                    el.classList.remove('text-gray-500', 'opacity-20');
-                }
-            });
-
-            // Scroll Logic: Position active line at ~40% of container height
-            // Container Height is fixed (h-96 = 384px). 40% is ~150px.
-            // We want scrollTop = activeSpan.offsetTop - 150
-            // Since containerRef is now absolute inside a relative overflow-hidden div, we transform it.
-            const targetY = -(currentTop - 150);
-            containerRef.current.style.transform = `translateY(${targetY}px)`;
-        }
-
         // Update RSVP Display
         if (rsvpRef.current) {
             const currentWord = words[idx];
@@ -337,6 +256,49 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                 const { bold, light } = getBionicSplit(currentWord);
                 rsvpRef.current.innerHTML = `<span class="font-bold text-white">${bold}</span><span class="opacity-70 text-gray-300">${light}</span>`;
             }
+        }
+
+        // Render Previous Context (Last ~30 words)
+        if (prevContainerRef.current) {
+            const start = Math.max(0, idx - 30);
+            const end = idx;
+            const prevWords = words.slice(start, end);
+            const html = prevWords.map((w, i) => {
+                const actualIndex = start + i;
+                const { bold, light } = getBionicSplit(w);
+                return `
+                    <span 
+                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
+                        data-index="${actualIndex}"
+                    >
+                        <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
+                    </span>
+                `;
+            }).join('');
+            prevContainerRef.current.innerHTML = html;
+            // Scroll to bottom
+            prevContainerRef.current.scrollTop = prevContainerRef.current.scrollHeight;
+        }
+
+        // Render Next Context (Next ~30 words)
+        if (nextContainerRef.current) {
+            const start = idx + 1;
+            const end = Math.min(words.length, idx + 31);
+            const nextWords = words.slice(start, end);
+            const html = nextWords.map((w, i) => {
+                const actualIndex = start + i;
+                const { bold, light } = getBionicSplit(w);
+                return `
+                    <span 
+                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
+                        data-index="${actualIndex}"
+                    >
+                        <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
+                    </span>
+                `;
+            }).join('');
+            nextContainerRef.current.innerHTML = html;
+            // Scroll to top (default)
         }
     };
 
@@ -451,151 +413,166 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     }
 
     return (
-        <div className="flex w-full h-full bg-basalt text-white overflow-hidden">
-            {/* Sidebar - Desktop (Always visible) */}
-            <div className="hidden md:block w-72 shrink-0 h-full">
-                <Sidebar
-                    chapters={chapters}
-                    currentChapter={currentChapter}
-                    onLoadChapter={loadChapter}
-                    onInspectChapter={setInspectingChapter}
-                    wpm={wpm}
-                />
-            </div>
-
-            {/* Sidebar - Mobile (Overlay, toggled) */}
-            {showSidebar && (
-                <div className="md:hidden absolute top-0 left-0 bottom-0 w-72 z-40 shadow-2xl">
-                    <Sidebar
-                        chapters={chapters}
-                        currentChapter={currentChapter}
-                        onLoadChapter={(id) => {
-                            loadChapter(id);
-                            setShowSidebar(false);
-                        }}
-                        onInspectChapter={setInspectingChapter}
-                        wpm={wpm}
-                    />
-                </div>
-            )}
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col relative h-full">
-                {/* Mobile Sidebar Toggle */}
+        <div className="relative w-full h-screen bg-basalt text-white overflow-hidden">
+            {/* Floating Header / Controls */}
+            <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-start pointer-events-none">
+                {/* Menu Button */}
                 <button
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    className="md:hidden absolute top-4 left-4 z-50 p-2 text-dune-gold hover:bg-white/10 rounded"
+                    onClick={() => setShowSidebar(true)}
+                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg"
+                    title="Chapters"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
 
-                {/* Reader Content */}
-                <div className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto p-4 relative">
-                    {/* Header Info */}
-                    <div className="absolute top-16 left-0 right-0 text-center">
-                        <h3 className="font-mono text-sm text-gray-500 tracking-widest uppercase">{currentChapter?.title}</h3>
+                {/* Chapter Title (Centered) */}
+                <div className="mt-2 px-6 py-2 bg-black/20 backdrop-blur-sm rounded-full border border-white/5 shadow-lg">
+                    <h3 className="font-mono text-xs text-gray-400 tracking-widest uppercase">{currentChapter?.title}</h3>
+                </div>
+
+                {/* Settings Button */}
+                <button data-testid="settings-button" onClick={() => setShowSettings(!showSettings)}
+                    className={`pointer-events-auto p-3 backdrop-blur-md rounded-full border border-white/10 transition-colors shadow-lg ${showSettings ? 'bg-dune-gold text-black' : 'bg-black/40 text-dune-gold hover:bg-white/10'}`}
+                    title="Settings"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Settings Overlay (Floating) */}
+            {showSettings && (
+                <div className="absolute top-20 right-4 z-50 w-72 bg-basalt/95 backdrop-blur-md rounded-xl border border-white/10 p-6 shadow-2xl flex flex-col gap-6">
+                    {/* Progress Control */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex justify-between text-xs font-mono text-gray-400">
+                            <span>PROGRESS</span>
+                            <span>{currentWordIndex} / {wordsRef.current.length}</span>
+                        </div>
+                        <input
+                            type="range" aria-label="Progress" min="0"
+                            max={wordsRef.current.length - 1}
+                            value={currentWordIndex}
+                            onChange={handleSliderChange}
+                            className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold hover:accent-magma-vent transition-colors"
+                        />
                     </div>
 
-                    {/* Reticle / Word Display */}
-                    <div
-                        className="relative w-full h-96 flex flex-col items-center justify-start border-y border-white/10 mb-8 bg-black/20 backdrop-blur-sm overflow-hidden group"
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                    >
-                        {/* Zone Indicators (Visual Only) */}
-                        <div className="absolute top-0 h-[40%] w-full bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-20"></div>
-                        <div className="absolute bottom-0 h-[40%] w-full bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-20"></div>
-                        
-                        {/* Bionic RSVP Focus Display (Fixed in Lower Center Zone) */}
-                        <div className="absolute top-[60%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none mix-blend-screen w-full text-center">
-                            <div ref={rsvpRef} className="text-6xl md:text-8xl font-mono text-white tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                                {wordsRef.current[currentWordIndex] && (() => {
-                                    const { bold, light } = getBionicSplit(wordsRef.current[currentWordIndex]);
-                                    return <><span className="font-bold text-white">{bold}</span><span className="opacity-70 text-gray-300">{light}</span></>;
-                                })()}
-                            </div>
+                    {/* WPM Control */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex justify-between text-xs font-mono text-gray-400">
+                            <span>VELOCITY</span>
+                            <span>{wpm} WPM</span>
                         </div>
-
-                        {/* Scroll Zones */}
-                        <div
-                            className="absolute top-0 left-0 right-0 h-12 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-n-resize"
-                            onMouseEnter={() => startScrolling('back')}
-                            onMouseLeave={stopScrolling}
-                        >
-                            SCROLL BACK
-                        </div>
-                        <div
-                            className="absolute bottom-0 left-0 right-0 h-12 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs font-mono text-magma-vent cursor-s-resize"
-                            onMouseEnter={() => startScrolling('fwd')}
-                            onMouseLeave={stopScrolling}
-                        >
-                            SCROLL FWD
-                        </div>
-
-                        {/* Flow Text Container - Scrollable */}
-                        <div className="w-full h-full overflow-hidden relative">
-                            <div ref={containerRef} className="w-full absolute top-0 left-0 transition-transform duration-300 ease-out" onClick={handleRiverClick}></div>
-                        </div>
+                        <input
+                            type="range" aria-label="WPM" min="100"
+                            max="1000"
+                            step="50"
+                            value={wpm}
+                            onChange={(e) => setWpm(parseInt(e.target.value))}
+                            className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold"
+                        />
                     </div>
 
-                    {/* Controls */}
-                    <div className="w-full flex flex-col gap-6">
-                        {/* Progress Bar */}
-                        <div className="w-full flex items-center gap-4">
-                            <span className="font-mono text-xs text-gray-500 w-12 text-right">{currentWordIndex}</span>
-                            <input
-                                type="range" aria-label="Progress" min="0"
-                                max={wordsRef.current.length - 1}
-                                value={currentWordIndex}
-                                onChange={handleSliderChange}
-                                className="flex-1 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold hover:accent-magma-vent transition-colors"
-                            />
-                            <span className="font-mono text-xs text-gray-500 w-12">{wordsRef.current.length}</span>
-                        </div>
-
-                        {/* Minimal Controls */}
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                {/* Removed Engage Button */}
-                                <span className="font-mono text-xs text-gray-500 uppercase tracking-wider">
-                                    {isPlaying ? 'READING...' : 'PAUSED'}
-                                </span>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <span className="font-mono text-xs text-gray-500 uppercase tracking-wider">Velocity: {wpm}</span>
-                                <input
-                                    type="range" aria-label="WPM" min="100"
-                                    max="1000"
-                                    step="50"
-                                    value={wpm}
-                                    onChange={(e) => setWpm(parseInt(e.target.value))}
-                                    className="w-32 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Chapter Navigation */}
-                        <div className="flex justify-between items-center mt-4 border-t border-white/10 pt-4">
-                            <button
-                                onClick={handlePrevChapter}
-                                disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === 0}
-                                className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
-                            >
-                                &lt; Prev Sequence
-                            </button>
-                            <button
-                                onClick={handleNextChapter}
-                                disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === chapters.length - 1}
-                                className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
-                            >
-                                Next Sequence &gt;
-                            </button>
-                        </div>
+                    {/* Chapter Navigation */}
+                    <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                        <button
+                            onClick={handlePrevChapter}
+                            disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === 0}
+                            className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
+                        >
+                            &lt; Prev
+                        </button>
+                        <button
+                            data-testid="next-chapter-button"
+                            onClick={handleNextChapter}
+                            disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === chapters.length - 1}
+                            className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
+                        >
+                            Next &gt;
+                        </button>
                     </div>
                 </div>
+            )}
+
+            {/* Sidebar Overlay (Drawer) */}
+            <div
+                className={`absolute inset-y-0 left-0 w-80 bg-basalt z-50 transform transition-transform duration-300 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-r border-white/10 ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
+            >
+                <Sidebar
+                    chapters={chapters}
+                    currentChapter={currentChapter}
+                    onLoadChapter={(id) => {
+                        loadChapter(id);
+                        setShowSidebar(false);
+                    }}
+                    onInspectChapter={setInspectingChapter}
+                    wpm={wpm}
+                />
+            </div>
+            {/* Backdrop for sidebar */}
+            {showSidebar && <div className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
+
+            {/* Main Reader Area (Full Screen) */}
+            <div className="w-full h-full flex flex-col relative group"
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+            >
+
+                {/* Top Zone: Previous Context */}
+                <div className="flex-1 w-full overflow-hidden relative mask-gradient-top">
+                    <div ref={prevContainerRef} className="w-full h-full flex flex-wrap content-end justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden"></div>
+                </div>
+
+                {/* Middle Zone: RSVP (Click to Toggle) */}
+                <div data-testid="rsvp-container" className="relative h-48 w-full flex items-center justify-center bg-black/20 border-y border-white/5 z-30 cursor-pointer hover:bg-white/5 transition-colors"
+                    onClick={() => setIsPlaying(!isPlayingRef.current)}
+                >
+                    {/* Bionic Word */}
+                    <div ref={rsvpRef} className="text-6xl md:text-8xl font-mono text-white tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                        {wordsRef.current[currentWordIndex] && (() => {
+                            const { bold, light } = getBionicSplit(wordsRef.current[currentWordIndex]);
+                            return <><span className="font-bold text-white">{bold}</span><span className="opacity-70 text-gray-300">{light}</span></>;
+                        })()}
+                    </div>
+
+                    {/* Play/Pause Overlay */}
+                    {!isPlaying && (
+                        <div data-testid="play-overlay" className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
+                            <div className="bg-black/40 backdrop-blur-sm p-6 rounded-full border border-white/10 shadow-2xl">
+                                <svg className="w-12 h-12 text-white/80 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Bottom Zone: Next Context */}
+                <div className="flex-1 w-full overflow-hidden relative mask-gradient-bottom">
+                    <div ref={nextContainerRef} className="w-full h-full flex flex-wrap content-start justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
+                </div>
+
+                {/* Scroll Zones */}
+                <div
+                    className="absolute top-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-center pt-4 text-xs font-mono text-magma-vent cursor-n-resize bg-gradient-to-b from-black/50 to-transparent pointer-events-auto"
+                    onMouseEnter={() => startScrolling('back')}
+                    onMouseLeave={stopScrolling}
+                >
+                    SCROLL BACK
+                </div>
+                <div
+                    className="absolute bottom-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 text-xs font-mono text-magma-vent cursor-s-resize bg-gradient-to-t from-black/50 to-transparent pointer-events-auto"
+                    onMouseEnter={() => startScrolling('fwd')}
+                    onMouseLeave={stopScrolling}
+                >
+                    SCROLL FWD
+                </div>
+
             </div>
 
             {/* Inspection Modal */}

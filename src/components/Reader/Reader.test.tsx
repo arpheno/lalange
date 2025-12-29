@@ -117,29 +117,24 @@ describe('Reader Component', () => {
     it('should toggle play/pause', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('PAUSED')).toBeInTheDocument();
+            expect(screen.getByTestId('play-overlay')).toBeInTheDocument();
         });
 
-        // Click the first word (index 0) to toggle play
-        // "Hello" -> "He" + "llo"
-        const wordParts = screen.getAllByText('He');
-        // We want the one in the flow view, which has the click handler
-        // The flow view spans have class "word-span"
-        const wordPart = wordParts.find(el => el.closest('.word-span'));
-        expect(wordPart).toBeDefined();
-        
-        if (wordPart) {
-            const wordSpan = wordPart.closest('.word-span');
-            expect(wordSpan).toBeInTheDocument();
+        // Click the RSVP container to toggle play
+        const rsvpContainer = screen.getByTestId('rsvp-container');
+        fireEvent.click(rsvpContainer);
 
-            if (wordSpan) {
-                fireEvent.click(wordSpan);
-                expect(screen.getByText('READING...')).toBeInTheDocument();
+        // Should be playing now (no overlay)
+        await waitFor(() => {
+            expect(screen.queryByTestId('play-overlay')).not.toBeInTheDocument();
+        });
 
-                fireEvent.click(wordSpan);
-                expect(screen.getByText('PAUSED')).toBeInTheDocument();
-            }
-        }
+        // Click again to pause
+        fireEvent.click(rsvpContainer);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('play-overlay')).toBeInTheDocument();
+        });
     });
 
     it('should navigate to next chapter', async () => {
@@ -149,8 +144,13 @@ describe('Reader Component', () => {
             expect(elements.length).toBeGreaterThan(0);
         });
 
-        const nextButtons = screen.getAllByText('Next Sequence >');
-        fireEvent.click(nextButtons[0]);
+        // Open settings
+        const settingsBtn = screen.getByTestId('settings-button');
+        fireEvent.click(settingsBtn);
+
+        // Click next chapter
+        const nextBtn = screen.getByTestId('next-chapter-button');
+        fireEvent.click(nextBtn);
 
         await waitFor(() => {
             const elements = screen.getAllByText('Chapter 2');
@@ -166,8 +166,12 @@ describe('Reader Component', () => {
     it('should save progress when pausing', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
-            expect(screen.getByText('PAUSED')).toBeInTheDocument();
+            expect(screen.getByTestId('play-overlay')).toBeInTheDocument();
         });
+
+        // Open settings to access slider
+        const settingsBtn = screen.getByTestId('settings-button');
+        fireEvent.click(settingsBtn);
 
         // Change slider
         const progressSlider = screen.getByRole('slider', { name: 'Progress' });

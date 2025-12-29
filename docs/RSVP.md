@@ -1,6 +1,6 @@
 This is the design specification for the **Scansion Interface** (codenamed "The Cockpit"). It is designed to look less like an e-reader and more like a high-performance instrument for data ingestion.
 
-### **1\. The HUD: Landscape "Cognitive Cockpit"**
+### **1. The HUD: Landscape "Cognitive Cockpit"**
 
 The interface is strictly **landscape-first** (desktop or horizontal phone). It divides the screen into a "Control Zone" (Left) and a "Focus Zone" (Center).
 
@@ -22,51 +22,59 @@ This is not just a table of contents; it is a live monitor of the AI's "digestio
 #### **B. Utility Controls**
 
 * **Location:** Anchored at the bottom-left of the sidebar (or floating bottom-left if sidebar is hidden).  
-* **\[ ⚙️ Settings \]:** Opens the "Cockpit" (Persona, Pacing Rules, etc.).  
-* **\[ 📚 Library \]:** Opens the Librarian Chat / Gutenberg Search overlay.
+* **[ ⚙️ Settings ]:** Opens the "Cockpit" (Persona, Pacing Rules, etc.).  
+* **[ 📚 Library ]:** Opens the Librarian Chat / Gutenberg Search overlay.
 
 ---
 
-### **2\. The Focus Zone (The RSVP Core)**
+### **2. The Focus Zone (The Flow Reader)**
 
-The center of the screen is the "Foveal Stage." This is where the actual reading happens.
+The center of the screen is the "Foveal Stage." Unlike traditional RSVP (Spritz), we do not use a single static box. Instead, we use a **Flowing Text Stream**.
 
-* **The Redicle / Anchor:**  
-  * The word appears dead-center.  
-  * **Bionic Highlighting:** The first 30–50% of the word is **Bold White**; the rest is **Light Grey**. This anchors the saccade immediately.  
+* **The Stream:**  
+  * Text flows naturally, left-aligned, from top to bottom.
+  * It resembles a standard paragraph view but is optimized for rapid serial processing.
+  * **Low Visibility Context:** The lines above and below the current reading line are visible but dimmed (low opacity). This provides context without distraction.
+
+* **The Active Line:**
+  * The reader moves **row by row**. The view scrolls vertically to keep the active line in the "sweet spot" (center-ish).
+  * **Word Highlighting:** Within the active line, the "current word" is highlighted in the background (e.g., a subtle block or underline). This highlight moves horizontally across the line as the reader progresses.
+  * **Bionic Reading:** The current word (and potentially surrounding words) uses Bionic Reading (bold start) to anchor the eye.
+
 * **Adaptive WPM (The "Breathing" Engine):**  
-  * The speed is not constant. It breathes.  
-  * There is a speed dial that provides a rough estimate, and we’re going to modify that speed by using an llm to annotate the text, this is described in a different document “editor”  
-  * We need to have some javascript rule based duration changing as we’re probably gonna do full stops commas and other punctuation (imagine hyphenated words, i probably need a full second to read that)
+  * The speed is not constant. It breathes based on text density and punctuation.
+  * **Punctuation Pacing:** Full stops, commas, and complex clauses trigger micro-pauses.
+  * **Density Pacing:** AI-analyzed "dense" sections slow down the stream automatically.
 
 ---
 
-### **3\. The Biological Overlay (The Context Field)**
+### **3. Interaction & Control (The "Karaoke" Mode)**
 
-This solves the \#1 issue with RSVP (losing context). It is a "Peripheral Vision" simulator surrounding the central word.
+This solves the #1 issue with RSVP (losing context/control). The interface invites interaction.
 
-* **The "River" of Text:**  
-  * **Above the RSVP line:** The previous 3–4 lines of text fade upwards into transparency.  
-  * **Below the RSVP line:** The next 3–4 lines of text fade downwards.  
-  * **Visual Style:** It is **not** high-contrast. It is subtle, ghost-like, and "biologically overlaid" (perhaps using a serif font for the river while the RSVP uses sans-serif).  
-* **Grayscale Density Heatmap:**  
-  * The flowing text isn't just one color. It uses **Luminance Coding**.  
-  * **Simple Text:** Rendered in standard cool grey.  
-  * **Dense Text:** Rendered in a darker, "heavier" charcoal or slate.  
-  * *Result:* You can subconsciously "see" a difficult paragraph coming up before you reach it.  
-* **Interactive Regression:**  
-  * **Tap-to-Seek:** If you miss a detail, you don't need a rewind button. You just **tap the word** in the "River" above. The RSVP engine instantly snaps to that location and pauses.  
-* **The "Analyst" Hover:**  
-  * Hovering over any word in the River triggers a tiny tooltip superscript (e.g., `Entropy: 0.92`), showing exactly why the AI decided to slow down there.
+* **Hover-to-Pause:**  
+  * When the mouse cursor enters the text area (above or below the current word), the stream **instantly pauses**.
+  * **Brightening:** The dimmed context lines brighten to full opacity, allowing the user to read the surrounding paragraph normally.
+  * **Click-to-Play:** To resume, the user simply clicks the word they want to start from (or the currently highlighted word).
+
+* **Scrolling Zones:**
+  * Small, stylized shaded areas at the top and bottom (or sides) of the text view act as "scroll zones."
+  * Moving the cursor into these zones scrolls the text line-by-line backwards or forwards, allowing for rapid skimming or regression.
+
+* **Minimalist UI:**
+  * **No "Engage" Button:** The text itself is the control. Click to play/pause.
+  * **Symbolic Controls:** Minimal icons for essential actions only.
+  * **Subtitle Header:** The book title and chapter title appear discreetly in the top bar, keeping the focus on the stream.
 
 ---
 
-### **4\. Summary of User Flow**
+### **4. Summary of User Flow**
 
-1. **Load:** User opens app. Sidebar shows "Chapter 1" filling up rapidly (processed by Qwen-0.5B).  
-2. **Read:** User hits Spacebar. Words flash in the center. The "River" flows gently behind it.  
-3. **Slow Down:** The text hits a philosophical knot. The RSVP slows down. The River text turns a darker shade of grey.  
-4. **Glitch:** User blinks and misses a word. They tap the sentence floating just above the center. The stream rewinds instantly.  
-5. **Finish:** Chapter 1 ends. The screen fades. The Sidebar shows Chapter 2 is already 100% processed and ready.
+1. **Load:** User opens app. Sidebar shows processing status.
+2. **Read:** User clicks the first word. The highlight begins moving across the line.
+3. **Flow:** As the highlight reaches the end of a line, the text scrolls up one row. The highlight jumps to the start of the new center line.
+4. **Interact:** User misses a detail. They move the mouse over the text. The stream pauses, the text brightens. They read the previous sentence.
+5. **Resume:** User clicks the word where they left off. The stream resumes.
+6. **Skim:** User moves mouse to the top "scroll zone" to quickly rewind a few paragraphs.
 
-This interface turns reading into **piloting**.
+This interface turns reading into a **guided flow**, blending the speed of RSVP with the context of traditional reading.
