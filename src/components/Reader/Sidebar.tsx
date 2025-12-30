@@ -10,6 +10,7 @@ interface SidebarProps {
     onInspectChapter: (chapter: ChapterDocType) => void;
     wpm: number;
     className?: string;
+    currentWordIndex?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -18,7 +19,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onLoadChapter,
     onInspectChapter,
     wpm,
-    className
+    className,
+    currentWordIndex
 }) => {
     const [expandedSummary, setExpandedSummary] = useState<string | null>(null);
 
@@ -153,8 +155,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         const isSafeSpeed = wpm < processingSpeed;
                                         const isSafeToRead = isFullyReady || (hasStarted && isSafeSpeed);
 
+                                        // Check if this is the currently active subchapter being read
+                                        const isActive = isCurrent && currentWordIndex !== undefined &&
+                                            currentWordIndex >= sub.startWordIndex &&
+                                            (currentWordIndex < sub.endWordIndex || (idx === chapter.subchapters!.length - 1 && currentWordIndex >= sub.startWordIndex));
+
                                         return (
                                             <div key={idx} className="flex flex-col relative group/sub">
+                                                {/* Active Reading Highlight */}
+                                                <div
+                                                    className={clsx(
+                                                        "absolute inset-0 transition-opacity duration-300 rounded-sm border border-white/10",
+                                                        isActive ? "opacity-100 bg-white/5" : "opacity-0"
+                                                    )}
+                                                />
                                                 {/* Health Bar Background */}
                                                 <div
                                                     className={clsx(
@@ -171,11 +185,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                     <button
                                                         className={clsx(
                                                             "flex-1 text-left text-[10px] py-1 transition-colors truncate pr-2",
-                                                            isFullyReady ? "text-gray-500 hover:text-dune-gold" : (isSafeToRead ? "text-canarian-pine font-bold" : "text-dune-gold font-bold")
+                                                            isActive ? "text-white font-bold" : (isFullyReady ? "text-gray-500 hover:text-dune-gold" : (isSafeToRead ? "text-canarian-pine font-bold" : "text-dune-gold font-bold"))
                                                         )}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setExpandedSummary(isExpanded ? null : summaryId);
+                                                            if (isExpanded) {
+                                                                if (hasStarted) {
+                                                                    onLoadChapter(chapter.id, sub.startWordIndex);
+                                                                }
+                                                            } else {
+                                                                setExpandedSummary(summaryId);
+                                                            }
                                                         }}
                                                     >
                                                         {sub.title} {!isFullyReady && "..."}

@@ -1,15 +1,26 @@
 import { useState, useEffect } from 'react'
 import { Library } from './components/Library/Library'
 import { Reader } from './components/Reader/Reader'
-import { FontPlayground } from './components/FontPlayground'
+import { SettingsPanel } from './components/Settings/SettingsPanel'
 import type { BookDocType } from './core/sync/db'
 import { useSettingsStore } from './core/store/settings'
 import { clsx } from 'clsx'
 
+type ViewState = 'library' | 'reader' | 'settings';
+
 function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
-  const [showPlayground, setShowPlayground] = useState(false)
+  const [view, setView] = useState<ViewState>('library')
   const { theme } = useSettingsStore()
+
+  // Sync view state with book selection
+  useEffect(() => {
+    if (currentBook) {
+      setView('reader');
+    } else if (view === 'reader') {
+      setView('library');
+    }
+  }, [currentBook]);
 
   // Apply theme to body
   useEffect(() => {
@@ -18,6 +29,14 @@ function App() {
     if (theme === 'ash') document.body.classList.add('theme-ash');
     // volcanic is default (no class)
   }, [theme]);
+
+  const handleCloseSettings = () => {
+    if (currentBook) {
+      setView('reader');
+    } else {
+      setView('library');
+    }
+  };
 
   return (
     <div className={clsx(
@@ -29,15 +48,21 @@ function App() {
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
           <button
-            onClick={() => setShowPlayground(!showPlayground)}
-            className="text-xs text-gray-600 hover:text-dune-gold transition-colors font-mono"
+            onClick={() => setView(view === 'settings' ? (currentBook ? 'reader' : 'library') : 'settings')}
+            className={clsx(
+              "text-xs transition-colors font-mono",
+              view === 'settings' ? "text-dune-gold font-bold" : "text-gray-600 hover:text-dune-gold"
+            )}
           >
-            [ {showPlayground ? 'APP' : 'TYPOGRAPHY'} ]
+            [ {view === 'settings' ? 'CLOSE_SETTINGS' : 'SETTINGS'} ]
           </button>
         </div>
-        {currentBook && !showPlayground && (
+        {view !== 'library' && (
           <button
-            onClick={() => setCurrentBook(null)}
+            onClick={() => {
+              setCurrentBook(null);
+              setView('library');
+            }}
             className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
           >
             [ BACK_TO_LIBRARY ]
@@ -49,10 +74,13 @@ function App() {
         {/* Mica Dust Layer */}
         <div className="mica-dust-layer" />
 
-        {showPlayground ? (
-          <FontPlayground />
-        ) : currentBook ? (
-          <Reader book={currentBook} />
+        {view === 'settings' ? (
+          <SettingsPanel onClose={handleCloseSettings} />
+        ) : view === 'reader' && currentBook ? (
+          <Reader
+            book={currentBook}
+            onOpenSettings={() => setView('settings')}
+          />
         ) : (
           <Library onOpenBook={setCurrentBook} />
         )}

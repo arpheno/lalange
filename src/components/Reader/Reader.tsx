@@ -3,15 +3,17 @@ import { type BookDocType, type ChapterDocType, type ReadingStateDocType, initDB
 import { getBionicSplit, getBionicGradientHtml } from '../../core/rsvp/bionic';
 import { getPunctuationDelay } from '../../core/rsvp/timing';
 import { Sidebar } from './Sidebar';
+import { useSettingsStore } from '../../core/store/settings';
 
 interface ReaderProps {
     book: BookDocType;
     onBack?: () => void;
+    onOpenSettings?: () => void;
 }
 
-export const Reader: React.FC<ReaderProps> = ({ book }) => {
+export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [wpm, setWpm] = useState(300);
+    const { wpm } = useSettingsStore();
 
     // State for current chapter and reading position
     const [currentChapter, setCurrentChapter] = useState<ChapterDocType | null>(null);
@@ -22,7 +24,6 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     // Sidebar & Chapters
     const [chapters, setChapters] = useState<ChapterDocType[]>([]);
     const [showSidebar, setShowSidebar] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
     const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
     const [, setTick] = useState(0); // Force re-render for live time updates
 
@@ -244,28 +245,47 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     };
 
     const scrollIntervalRef = useRef<any>(null);
-    const chunkStartRef = useRef<number>(-1);
-    const chunkEndRef = useRef<number>(-1);
+    const scrollStartTimeRef = useRef<number>(0);
 
     const startScrolling = (direction: 'back' | 'fwd') => {
         if (scrollIntervalRef.current) return;
 
-        scrollIntervalRef.current = setInterval(() => {
+        scrollStartTimeRef.current = Date.now();
+
+        const scrollLoop = () => {
+            const now = Date.now();
+            const elapsed = now - scrollStartTimeRef.current;
+
+            // Exponential speed increase:
+            // Start slow (1 word per tick) for first 1s
+            // Then ramp up speed
+            let speed = 1;
+            if (elapsed > 1000) {
+                // After 1s, speed increases based on time
+                // e.g. at 2s -> speed 5, at 3s -> speed 10
+                speed = Math.floor(1 + (elapsed - 1000) / 200);
+            }
+
             const newIndex = direction === 'back'
-                ? Math.max(0, indexRef.current - 5)
-                : Math.min(wordsRef.current.length - 1, indexRef.current + 5);
+                ? Math.max(0, indexRef.current - speed)
+                : Math.min(wordsRef.current.length - 1, indexRef.current + speed);
 
             if (newIndex !== indexRef.current) {
                 indexRef.current = newIndex;
                 setCurrentWordIndex(newIndex);
                 renderWord(newIndex, wordsRef.current);
+                scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
+            } else {
+                scrollIntervalRef.current = null; // Stop if hit boundary
             }
-        }, 100);
+        };
+
+        scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
     };
 
     const stopScrolling = () => {
         if (scrollIntervalRef.current) {
-            clearInterval(scrollIntervalRef.current);
+            cancelAnimationFrame(scrollIntervalRef.current);
             scrollIntervalRef.current = null;
         }
     };
@@ -280,21 +300,26 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             }
         }
 
-        // Render Previous Context (Last ~30 words)
+        // Render Previous Context (Last ~150 words for better vertical fill)
         if (prevContainerRef.current) {
-            const start = Math.max(0, idx - 30);
+            const start = Math.max(0, idx - 150);
             const end = idx;
             const prevWords = words.slice(start, end);
             const html = prevWords.map((w, i) => {
                 const actualIndex = start + i;
                 const { bold, light } = getBionicSplit(w);
+                // Add line break after punctuation to simulate structure
+                const isEnd = /[.!?]$/.test(w);
+                const breakHtml = isEnd ? '<div class="w-full h-2"></div>' : '';
+
                 return `
                     <span 
-                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
+                        class="word-span inline-block mr-1.5 mb-1 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
                         data-index="${actualIndex}"
                     >
                         <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
                     </span>
+                    ${breakHtml}
                 `;
             }).join('');
             prevContainerRef.current.innerHTML = html;
@@ -302,21 +327,25 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             prevContainerRef.current.scrollTop = prevContainerRef.current.scrollHeight;
         }
 
-        // Render Next Context (Next ~30 words)
+        // Render Next Context (Next ~150 words)
         if (nextContainerRef.current) {
             const start = idx + 1;
-            const end = Math.min(words.length, idx + 31);
+            const end = Math.min(words.length, idx + 151);
             const nextWords = words.slice(start, end);
             const html = nextWords.map((w, i) => {
                 const actualIndex = start + i;
                 const { bold, light } = getBionicSplit(w);
+                const isEnd = /[.!?]$/.test(w);
+                const breakHtml = isEnd ? '<div class="w-full h-2"></div>' : '';
+
                 return `
                     <span 
-                        class="word-span inline-block mr-2 mb-2 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
+                        class="word-span inline-block mr-1.5 mb-1 transition-all duration-300 cursor-pointer text-gray-500 opacity-40 hover:opacity-100 hover:text-white"
                         data-index="${actualIndex}"
                     >
                         <span class="font-bold">${bold}</span><span class="font-light opacity-80">${light}</span>
                     </span>
+                    ${breakHtml}
                 `;
             }).join('');
             nextContainerRef.current.innerHTML = html;
@@ -337,9 +366,8 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     if (newIndex === indexRef.current) {
                         setIsPlaying(!isPlayingRef.current);
                     } else {
-                        // Jump to new word and pause (or keep playing? User said "click to play/pause" on playing word)
-                        // "Resume: User clicks the word where they left off."
-                        setIsPlaying(true);
+                        // Jump to new word and PAUSE so user can read context
+                        setIsPlaying(false);
                         indexRef.current = newIndex;
                         setCurrentWordIndex(newIndex);
                         renderWord(newIndex, wordsRef.current);
@@ -347,6 +375,9 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     saveProgress();
                 }
             }
+        } else {
+            // Clicked background of stream - Toggle Play/Pause
+            setIsPlaying(!isPlayingRef.current);
         }
     };
 
@@ -490,6 +521,15 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         return <div className="flex items-center justify-center h-full font-mono text-dune-gold animate-pulse">INITIALIZING COCKPIT...</div>;
     }
 
+    // Calculate Subchapter Progress
+    const currentSubchapter = currentChapter?.subchapters?.find(s => currentWordIndex >= s.startWordIndex && currentWordIndex < s.endWordIndex);
+    let subchapterProgress = 0;
+    if (currentSubchapter) {
+        const total = currentSubchapter.endWordIndex - currentSubchapter.startWordIndex;
+        const current = currentWordIndex - currentSubchapter.startWordIndex;
+        subchapterProgress = Math.min(1, Math.max(0, current / total));
+    }
+
     return (
         <div className="relative w-full h-screen bg-basalt text-white overflow-hidden flex">
             {/* Floating Header / Controls */}
@@ -511,8 +551,8 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                 </div>
 
                 {/* Settings Button */}
-                <button data-testid="settings-button" onClick={() => setShowSettings(!showSettings)}
-                    className={`pointer-events-auto p-3 backdrop-blur-md rounded-full border border-white/10 transition-colors shadow-lg ${showSettings ? 'bg-dune-gold text-black' : 'bg-black/40 text-dune-gold hover:bg-white/10'}`}
+                <button data-testid="settings-button" onClick={onOpenSettings}
+                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg"
                     title="Settings"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -521,75 +561,6 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     </svg>
                 </button>
             </div>
-
-            {/* Settings Overlay (Floating) */}
-            {showSettings && (
-                <div className="absolute top-20 right-4 z-50 w-72 bg-basalt/95 backdrop-blur-md rounded-xl border border-white/10 p-6 shadow-2xl flex flex-col gap-6">
-                    {/* Progress Control */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex justify-between text-xs font-mono text-gray-400">
-                            <span>PROGRESS</span>
-                            <span>{currentWordIndex} / {wordsRef.current.length}</span>
-                        </div>
-                        <input
-                            type="range" aria-label="Progress" min="0"
-                            max={wordsRef.current.length - 1}
-                            value={currentWordIndex}
-                            onChange={handleSliderChange}
-                            className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold hover:accent-magma-vent transition-colors"
-                        />
-                    </div>
-
-                    {/* WPM Control */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex justify-between text-xs font-mono text-gray-400">
-                            <span>VELOCITY</span>
-                            <span>{wpm} WPM</span>
-                        </div>
-                        <input
-                            type="range" aria-label="WPM" min="100"
-                            max="1000"
-                            step="50"
-                            value={wpm}
-                            onChange={(e) => setWpm(parseInt(e.target.value))}
-                            className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-dune-gold"
-                        />
-                    </div>
-
-                    {/* Chapter Navigation */}
-                    <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                        <button
-                            onClick={handlePrevChapter}
-                            disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === 0}
-                            className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
-                        >
-                            &lt; Prev
-                        </button>
-                        <button
-                            data-testid="next-chapter-button"
-                            onClick={handleNextChapter}
-                            disabled={!currentChapter || chapters.findIndex(c => c.id === currentChapter.id) === chapters.length - 1}
-                            className="text-xs font-mono text-gray-500 hover:text-dune-gold disabled:opacity-30 uppercase tracking-wider transition-colors"
-                        >
-                            Next &gt;
-                        </button>
-                    </div>
-
-                    {/* Danger Zone */}
-                    <div className="pt-4 border-t border-white/10">
-                        <button
-                            onClick={() => {
-                                if (confirm('NUKE DATABASE? This will delete all books and progress.')) {
-                                    resetDB();
-                                }
-                            }}
-                            className="w-full py-2 text-xs font-mono text-red-500 border border-red-500/30 hover:bg-red-500/10 rounded transition-colors uppercase tracking-widest"
-                        >
-                            NUKE DATABASE
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* Sidebar Overlay (Drawer) */}
             <div
@@ -606,6 +577,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     }}
                     onInspectChapter={setInspectingChapter}
                     wpm={wpm}
+                    currentWordIndex={currentWordIndex}
                 />
             </div>
             {/* Backdrop for sidebar */}
@@ -619,8 +591,8 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                 >
 
                     {/* Top Zone: Previous Context */}
-                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-top">
-                        <div ref={prevContainerRef} className="w-full h-full flex flex-wrap content-end justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden"></div>
+                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-top flex justify-center">
+                        <div ref={prevContainerRef} className="w-full max-w-2xl h-full flex flex-wrap content-end justify-start p-8 md:p-16 font-mono text-lg md:text-xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
                     </div>
 
                     {/* Middle Zone: RSVP (Click to Toggle) */}
@@ -636,6 +608,21 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                             )}
                         </div>
 
+                        {/* Subchapter Progress Lights */}
+                        {currentSubchapter && (
+                            <div className="absolute bottom-6 flex gap-3 pointer-events-none">
+                                {[...Array(5)].map((_, i) => {
+                                    const isLit = subchapterProgress >= (i / 5);
+                                    return (
+                                        <div
+                                            key={i}
+                                            className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${isLit ? 'bg-dune-gold shadow-[0_0_8px_var(--color-dune-gold)]' : 'bg-white/10'}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
+
                         {/* Play/Pause Overlay */}
                         {!isPlaying && (
                             <div data-testid="play-overlay" className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
@@ -649,24 +636,28 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     </div>
 
                     {/* Bottom Zone: Next Context */}
-                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-bottom">
-                        <div ref={nextContainerRef} className="w-full h-full flex flex-wrap content-start justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
+                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-bottom flex justify-center">
+                        <div ref={nextContainerRef} className="w-full max-w-2xl h-full flex flex-wrap content-start justify-start p-8 md:p-16 font-mono text-lg md:text-xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
                     </div>
 
                     {/* Scroll Zones */}
                     <div
-                        className="absolute top-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-center pt-4 text-xs font-mono text-magma-vent cursor-n-resize bg-gradient-to-b from-black/50 to-transparent pointer-events-auto"
+                        className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-12 z-40 opacity-30 hover:opacity-100 transition-opacity flex items-center justify-center cursor-n-resize bg-gradient-to-b from-black/80 to-transparent pointer-events-auto group/scroll"
                         onMouseEnter={() => startScrolling('back')}
                         onMouseLeave={stopScrolling}
                     >
-                        SCROLL BACK
+                        <svg className="w-6 h-6 text-white/50 group-hover/scroll:text-white transition-colors animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
                     </div>
                     <div
-                        className="absolute bottom-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 text-xs font-mono text-magma-vent cursor-s-resize bg-gradient-to-t from-black/50 to-transparent pointer-events-auto"
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-12 z-40 opacity-30 hover:opacity-100 transition-opacity flex items-center justify-center cursor-s-resize bg-gradient-to-t from-black/80 to-transparent pointer-events-auto group/scroll"
                         onMouseEnter={() => startScrolling('fwd')}
                         onMouseLeave={stopScrolling}
                     >
-                        SCROLL FWD
+                        <svg className="w-6 h-6 text-white/50 group-hover/scroll:text-white transition-colors animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                     </div>
 
                 </div>
@@ -706,6 +697,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

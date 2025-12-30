@@ -24,9 +24,37 @@ interface SettingsState {
     sidebarOpen: boolean;
     setSidebarOpen: (open: boolean) => void;
 
-    // Advanced
+    // Advanced / Janitor
     licenseAnnihilator: boolean;
     toggleLicenseAnnihilator: () => void;
+    structuralScrubber: boolean;
+    setStructuralScrubber: (enabled: boolean) => void;
+    footnoteSuppressor: boolean;
+    setFootnoteSuppressor: (enabled: boolean) => void;
+    manualOverrideRules: string;
+    setManualOverrideRules: (rules: string) => void;
+
+    // Transformation
+    llmModel: 'tiny' | 'balanced' | 'pro';
+    setLlmModel: (model: 'tiny' | 'balanced' | 'pro') => void;
+    autoUpgradeEngine: boolean;
+    setAutoUpgradeEngine: (enabled: boolean) => void;
+    stylingPreset: 'analyst' | 'pirate' | 'zoomer' | 'stoic' | 'victorian' | 'custom';
+    setStylingPreset: (preset: 'analyst' | 'pirate' | 'zoomer' | 'stoic' | 'victorian' | 'custom') => void;
+    customStylingPrompt: string;
+    setCustomStylingPrompt: (prompt: string) => void;
+    stylingIntensity: number;
+    setStylingIntensity: (intensity: number) => void;
+
+    // Pacing
+    pacingGranularity: 'paragraph' | 'sentence' | 'word';
+    setPacingGranularity: (granularity: 'paragraph' | 'sentence' | 'word') => void;
+    pacingSensitivity: number;
+    setPacingSensitivity: (sensitivity: number) => void;
+
+    // Librarian
+    librarianModel: 'mistral' | 'llama' | 'other';
+    setLibrarianModel: (model: 'mistral' | 'llama' | 'other') => void;
 
     // AI / Summarization
     summaryChunkSize: number;
@@ -58,6 +86,31 @@ export const useSettingsStore = create<SettingsState>()(
 
             licenseAnnihilator: true,
             toggleLicenseAnnihilator: () => set((state) => ({ licenseAnnihilator: !state.licenseAnnihilator })),
+            structuralScrubber: true,
+            setStructuralScrubber: (structuralScrubber) => set({ structuralScrubber }),
+            footnoteSuppressor: true,
+            setFootnoteSuppressor: (footnoteSuppressor) => set({ footnoteSuppressor }),
+            manualOverrideRules: '',
+            setManualOverrideRules: (manualOverrideRules) => set({ manualOverrideRules }),
+
+            llmModel: 'tiny',
+            setLlmModel: (llmModel) => set({ llmModel }),
+            autoUpgradeEngine: true,
+            setAutoUpgradeEngine: (autoUpgradeEngine) => set({ autoUpgradeEngine }),
+            stylingPreset: 'analyst',
+            setStylingPreset: (stylingPreset) => set({ stylingPreset }),
+            customStylingPrompt: '',
+            setCustomStylingPrompt: (customStylingPrompt) => set({ customStylingPrompt }),
+            stylingIntensity: 0,
+            setStylingIntensity: (stylingIntensity) => set({ stylingIntensity }),
+
+            pacingGranularity: 'paragraph',
+            setPacingGranularity: (pacingGranularity) => set({ pacingGranularity }),
+            pacingSensitivity: 50,
+            setPacingSensitivity: (pacingSensitivity) => set({ pacingSensitivity }),
+
+            librarianModel: 'mistral',
+            setLibrarianModel: (librarianModel) => set({ librarianModel }),
 
             summaryChunkSize: 2500,
             setSummaryChunkSize: (summaryChunkSize) => set({ summaryChunkSize }),
