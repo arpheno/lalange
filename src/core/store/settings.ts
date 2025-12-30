@@ -27,6 +27,12 @@ interface SettingsState {
     // Advanced
     licenseAnnihilator: boolean;
     toggleLicenseAnnihilator: () => void;
+
+    // AI / Summarization
+    summaryChunkSize: number;
+    setSummaryChunkSize: (size: number) => void;
+    summaryPrompt: string;
+    setSummaryPrompt: (prompt: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -52,6 +58,12 @@ export const useSettingsStore = create<SettingsState>()(
 
             licenseAnnihilator: true,
             toggleLicenseAnnihilator: () => set((state) => ({ licenseAnnihilator: !state.licenseAnnihilator })),
+
+            summaryChunkSize: 2500,
+            setSummaryChunkSize: (summaryChunkSize) => set({ summaryChunkSize }),
+
+            summaryPrompt: "Summarize the following text in 5 sentences. Focus on the plot and key events.",
+            setSummaryPrompt: (summaryPrompt) => set({ summaryPrompt }),
         }),
         {
             name: 'lalange-settings',

@@ -88,6 +88,10 @@ export const chapterSchema = {
             type: 'number', // WPM
             default: 0
         },
+        lastTPM: {
+            type: 'number', // Tokens Per Minute
+            default: 0
+        },
         lastChunkCompletedAt: {
             type: 'number', // Timestamp (ms since epoch)
             default: 0
@@ -102,6 +106,18 @@ export const chapterSchema = {
             type: 'array',
             items: {
                 type: 'number'
+            }
+        },
+        subchapters: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' },
+                    summary: { type: 'string' },
+                    startWordIndex: { type: 'number' },
+                    endWordIndex: { type: 'number' }
+                }
             }
         }
     },

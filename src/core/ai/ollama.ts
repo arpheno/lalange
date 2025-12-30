@@ -3,6 +3,12 @@ export interface OllamaResponse {
     created_at: string;
     response: string;
     done: boolean;
+    total_duration?: number;
+    load_duration?: number;
+    prompt_eval_count?: number;
+    prompt_eval_duration?: number;
+    eval_count?: number;
+    eval_duration?: number;
 }
 
 export const checkOllamaHealth = async (): Promise<boolean> => {
@@ -14,7 +20,7 @@ export const checkOllamaHealth = async (): Promise<boolean> => {
     }
 };
 
-export const generateCompletion = async (prompt: string, model: string = 'llama3.1'): Promise<string> => {
+export const generateCompletion = async (prompt: string, model: string = 'llama3.1'): Promise<{ response: string, metrics?: OllamaResponse }> => {
     try {
         const response = await fetch('http://localhost:11434/api/generate', {
             method: 'POST',
@@ -36,7 +42,7 @@ export const generateCompletion = async (prompt: string, model: string = 'llama3
         }
 
         const data = await response.json() as OllamaResponse;
-        return data.response;
+        return { response: data.response, metrics: data };
     } catch (e) {
         console.error('Ollama generation failed:', e);
         throw e;

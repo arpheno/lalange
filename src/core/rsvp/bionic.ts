@@ -15,3 +15,37 @@ export const getBionicSplit = (word: string): { bold: string, light: string } =>
         light: word.slice(boldLength)
     };
 };
+
+/**
+ * Generates an HTML string with a font-weight gradient for the first 4 characters.
+ * 1st char: Bold (700) / Opacity 100%
+ * 2nd char: SemiBold (600) / Opacity 90%
+ * 3rd char: Medium (500) / Opacity 80%
+ * 4th char: Regular (400) / Opacity 70%
+ * Rest: Light (300) / Opacity 50%
+ */
+export const getBionicGradientHtml = (word: string): string => {
+    if (!word) return '';
+
+    let html = '';
+    const len = word.length;
+
+    // Character 1: Bold (700)
+    if (len > 0) html += `<span class="font-bold opacity-100">${word[0]}</span>`;
+
+    // Character 2: SemiBold (600)
+    if (len > 1) html += `<span class="font-semibold opacity-90">${word[1]}</span>`;
+
+    // Character 3: Medium (500)
+    if (len > 2) html += `<span class="font-medium opacity-80">${word[2]}</span>`;
+
+    // Character 4: Regular (400)
+    if (len > 3) html += `<span class="font-normal opacity-70">${word[3]}</span>`;
+
+    // Rest: Light/Normal with opacity
+    if (len > 4) {
+        html += `<span class="font-light opacity-50">${word.slice(4)}</span>`;
+    }
+
+    return html;
+};

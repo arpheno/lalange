@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Library } from './components/Library/Library'
 import { Reader } from './components/Reader/Reader'
+import { FontPlayground } from './components/FontPlayground'
 import type { BookDocType } from './core/sync/db'
 import { useSettingsStore } from './core/store/settings'
 import { clsx } from 'clsx'
 
 function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
+  const [showPlayground, setShowPlayground] = useState(false)
   const { theme } = useSettingsStore()
 
   // Apply theme to body
@@ -24,8 +26,16 @@ function App() {
       "bg-basalt text-white"
     )}>
       <div className="w-full flex justify-between items-center p-4 border-b border-white/10 bg-black/20 backdrop-blur-sm z-10">
-        <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
-        {currentBook && (
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
+          <button
+            onClick={() => setShowPlayground(!showPlayground)}
+            className="text-xs text-gray-600 hover:text-dune-gold transition-colors font-mono"
+          >
+            [ {showPlayground ? 'APP' : 'TYPOGRAPHY'} ]
+          </button>
+        </div>
+        {currentBook && !showPlayground && (
           <button
             onClick={() => setCurrentBook(null)}
             className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
@@ -39,7 +49,9 @@ function App() {
         {/* Mica Dust Layer */}
         <div className="mica-dust-layer" />
 
-        {currentBook ? (
+        {showPlayground ? (
+          <FontPlayground />
+        ) : currentBook ? (
           <Reader book={currentBook} />
         ) : (
           <Library onOpenBook={setCurrentBook} />

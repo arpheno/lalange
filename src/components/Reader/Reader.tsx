@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { type BookDocType, type ChapterDocType, type ReadingStateDocType, initDB } from '../../core/sync/db';
-import { getBionicSplit } from '../../core/rsvp/bionic';
+import { type BookDocType, type ChapterDocType, type ReadingStateDocType, initDB, resetDB } from '../../core/sync/db';
+import { getBionicSplit, getBionicGradientHtml } from '../../core/rsvp/bionic';
 import { getPunctuationDelay } from '../../core/rsvp/timing';
 import { Sidebar } from './Sidebar';
 
@@ -41,11 +41,29 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     const wasPlayingRef = useRef(false);
     const wordsRef = useRef<string[]>([]);
     const densitiesRef = useRef<number[]>([]);
+    const chaptersRef = useRef(chapters);
+    const currentChapterRef = useRef(currentChapter);
+
+    // Summary Mode Refs
+    const [isSummaryActive, setIsSummaryActive] = useState(false);
+    const isSummaryActiveRef = useRef(false);
+    const savedChapterIndexRef = useRef(0);
+    const summaryWordsRef = useRef<string[]>([]);
 
     // Sync refs
     useEffect(() => {
-        wpmRef.current = wpm;
+        if (!isSummaryActiveRef.current) {
+            wpmRef.current = wpm;
+        }
     }, [wpm]);
+
+    useEffect(() => {
+        chaptersRef.current = chapters;
+    }, [chapters]);
+
+    useEffect(() => {
+        currentChapterRef.current = currentChapter;
+    }, [currentChapter]);
 
     useEffect(() => {
         isPlayingRef.current = isPlaying;
@@ -140,7 +158,7 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     // Ref to hold the current chapter subscription
     const chapterSubRef = useRef<any>(null);
 
-    const loadChapter = async (chapterId: string, initialIndex: number = 0) => {
+    const loadChapter = async (chapterId: string, initialIndex: number = 0, autoPlay: boolean = false) => {
         setIsPlaying(false);
         setLoading(true);
         // Use a local flag to track if this is the first emission (load) or subsequent (update)
@@ -187,6 +205,10 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                             currentWordIndex: 0
                         });
                     }
+                }
+
+                if (autoPlay) {
+                    setIsPlaying(true);
                 }
             } else {
                 // Live update
@@ -253,8 +275,8 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         if (rsvpRef.current) {
             const currentWord = words[idx];
             if (currentWord) {
-                const { bold, light } = getBionicSplit(currentWord);
-                rsvpRef.current.innerHTML = `<span class="font-bold text-white">${bold}</span><span class="opacity-70 text-gray-300">${light}</span>`;
+                // Use gradient for the main RSVP display
+                rsvpRef.current.innerHTML = getBionicGradientHtml(currentWord);
             }
         }
 
@@ -361,8 +383,11 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         }
 
         while (true) {
-            const currentWord = wordsRef.current[indexRef.current] || '';
-            const density = densitiesRef.current[indexRef.current];
+            const activeWords = isSummaryActiveRef.current ? summaryWordsRef.current : wordsRef.current;
+            const activeDensities = isSummaryActiveRef.current ? [] : densitiesRef.current;
+
+            const currentWord = activeWords[indexRef.current] || '';
+            const density = activeDensities[indexRef.current];
             const currentDensity = density !== undefined ? density : 1.0;
             // If density is 0 (junk), we ignore punctuation delay to ensure it's skipped instantly
             const punctuationDelay = currentDensity === 0 ? 0 : getPunctuationDelay(currentWord, baseInterval);
@@ -370,14 +395,66 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
             const targetInterval = (baseInterval * currentDensity) + punctuationDelay;
 
             if (accumulatorRef.current >= targetInterval) {
-                if (indexRef.current < wordsRef.current.length - 1) {
+                if (indexRef.current < activeWords.length - 1) {
                     indexRef.current++;
                     accumulatorRef.current -= targetInterval;
                     shouldRender = true;
+
+                    // Check for Subchapter Boundary (only if NOT in summary mode)
+                    if (!isSummaryActiveRef.current) {
+                        const sub = currentChapterRef.current?.subchapters?.find(s => s.endWordIndex === indexRef.current);
+                        if (sub && sub.summary) {
+                            // Enter Summary Mode
+                            isSummaryActiveRef.current = true;
+                            setIsSummaryActive(true);
+
+                            savedChapterIndexRef.current = indexRef.current;
+
+                            // Swap words
+                            summaryWordsRef.current = sub.summary.split(' ');
+                            indexRef.current = 0;
+
+                            // Slow down WPM
+                            wpmRef.current = 100;
+
+                            // Force render first word of summary
+                            renderWord(0, summaryWordsRef.current);
+                            return; // Continue loop next frame
+                        }
+                    }
                 } else {
-                    setIsPlaying(false);
+                    // End of words
+                    if (isSummaryActiveRef.current) {
+                        // End of Summary -> Resume Chapter
+                        isSummaryActiveRef.current = false;
+                        setIsSummaryActive(false);
+
+                        // Restore
+                        indexRef.current = savedChapterIndexRef.current;
+                        wpmRef.current = wpm; // Restore user WPM
+
+                        renderWord(indexRef.current, wordsRef.current);
+                        return;
+                    }
+
+                    // End of Chapter
                     shouldRender = true;
-                    break;
+
+                    // Find next chapter
+                    const chapters = chaptersRef.current;
+                    const currentChapter = currentChapterRef.current;
+                    const currentIndex = chapters.findIndex(c => c.id === currentChapter?.id);
+
+                    if (currentIndex !== -1 && currentIndex < chapters.length - 1) {
+                        const nextChapter = chapters[currentIndex + 1];
+                        // Auto-play next chapter
+                        loadChapter(nextChapter.id, 0, true);
+                        // Break loop, loadChapter will restart it via setIsPlaying(true)
+                        break;
+                    } else {
+                        setIsPlaying(false);
+                        break;
+                    }
                 }
             } else {
                 break;
@@ -385,7 +462,8 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
         }
 
         if (shouldRender) {
-            renderWord(indexRef.current, wordsRef.current);
+            const activeWords = isSummaryActiveRef.current ? summaryWordsRef.current : wordsRef.current;
+            renderWord(indexRef.current, activeWords);
         }
 
         requestRef.current = requestAnimationFrame(loop);
@@ -413,13 +491,13 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
     }
 
     return (
-        <div className="relative w-full h-screen bg-basalt text-white overflow-hidden">
+        <div className="relative w-full h-screen bg-basalt text-white overflow-hidden flex">
             {/* Floating Header / Controls */}
             <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-start pointer-events-none">
                 {/* Menu Button */}
                 <button
                     onClick={() => setShowSidebar(true)}
-                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg"
+                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg lg:hidden"
                     title="Chapters"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,83 +574,102 @@ export const Reader: React.FC<ReaderProps> = ({ book }) => {
                             Next &gt;
                         </button>
                     </div>
+
+                    {/* Danger Zone */}
+                    <div className="pt-4 border-t border-white/10">
+                        <button
+                            onClick={() => {
+                                if (confirm('NUKE DATABASE? This will delete all books and progress.')) {
+                                    resetDB();
+                                }
+                            }}
+                            className="w-full py-2 text-xs font-mono text-red-500 border border-red-500/30 hover:bg-red-500/10 rounded transition-colors uppercase tracking-widest"
+                        >
+                            NUKE DATABASE
+                        </button>
+                    </div>
                 </div>
             )}
 
             {/* Sidebar Overlay (Drawer) */}
             <div
-                className={`absolute inset-y-0 left-0 w-80 bg-basalt z-50 transform transition-transform duration-300 shadow-[0_0_50px_rgba(0,0,0,0.5)] border-r border-white/10 ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed inset-y-0 left-0 z-50 w-80 bg-basalt border-r border-white/10 transform transition-transform duration-300 lg:relative lg:translate-x-0 lg:z-0 lg:shadow-none ${showSidebar ? 'translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.5)]' : '-translate-x-full'}`}
             >
                 <Sidebar
                     chapters={chapters}
                     currentChapter={currentChapter}
-                    onLoadChapter={(id) => {
-                        loadChapter(id);
-                        setShowSidebar(false);
+                    onLoadChapter={(id, index) => {
+                        loadChapter(id, index || 0);
+                        if (window.innerWidth < 1024) {
+                            setShowSidebar(false);
+                        }
                     }}
                     onInspectChapter={setInspectingChapter}
                     wpm={wpm}
                 />
             </div>
             {/* Backdrop for sidebar */}
-            {showSidebar && <div className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setShowSidebar(false)} />}
+            {showSidebar && <div className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm lg:hidden" onClick={() => setShowSidebar(false)} />}
 
             {/* Main Reader Area (Full Screen) */}
-            <div className="w-full h-full flex flex-col relative group"
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-            >
-
-                {/* Top Zone: Previous Context */}
-                <div className="flex-1 w-full overflow-hidden relative mask-gradient-top">
-                    <div ref={prevContainerRef} className="w-full h-full flex flex-wrap content-end justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden"></div>
-                </div>
-
-                {/* Middle Zone: RSVP (Click to Toggle) */}
-                <div data-testid="rsvp-container" className="relative h-48 w-full flex items-center justify-center bg-black/20 border-y border-white/5 z-30 cursor-pointer hover:bg-white/5 transition-colors"
-                    onClick={() => setIsPlaying(!isPlayingRef.current)}
+            <div className="flex-1 h-full relative flex flex-col min-w-0">
+                <div className="w-full h-full flex flex-col relative group"
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
                 >
-                    {/* Bionic Word */}
-                    <div ref={rsvpRef} className="text-6xl md:text-8xl font-mono text-white tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                        {wordsRef.current[currentWordIndex] && (() => {
-                            const { bold, light } = getBionicSplit(wordsRef.current[currentWordIndex]);
-                            return <><span className="font-bold text-white">{bold}</span><span className="opacity-70 text-gray-300">{light}</span></>;
-                        })()}
+
+                    {/* Top Zone: Previous Context */}
+                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-top">
+                        <div ref={prevContainerRef} className="w-full h-full flex flex-wrap content-end justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden"></div>
                     </div>
 
-                    {/* Play/Pause Overlay */}
-                    {!isPlaying && (
-                        <div data-testid="play-overlay" className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
-                            <div className="bg-black/40 backdrop-blur-sm p-6 rounded-full border border-white/10 shadow-2xl">
-                                <svg className="w-12 h-12 text-white/80 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                            </div>
+                    {/* Middle Zone: RSVP (Click to Toggle) */}
+                    <div
+                        data-testid="rsvp-container"
+                        className="relative h-48 w-full flex items-center justify-center bg-black/20 border-y border-white/5 z-30 cursor-pointer hover:bg-white/5 transition-colors"
+                        onClick={() => setIsPlaying(!isPlayingRef.current)}
+                    >
+                        {/* Bionic Word */}
+                        <div ref={rsvpRef} className={`text-6xl md:text-8xl font-mono tracking-tight whitespace-nowrap drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] ${isSummaryActive ? 'text-orange-500' : 'text-white'}`}>
+                            {wordsRef.current[currentWordIndex] && (
+                                <span dangerouslySetInnerHTML={{ __html: getBionicGradientHtml(wordsRef.current[currentWordIndex]) }} />
+                            )}
                         </div>
-                    )}
-                </div>
 
-                {/* Bottom Zone: Next Context */}
-                <div className="flex-1 w-full overflow-hidden relative mask-gradient-bottom">
-                    <div ref={nextContainerRef} className="w-full h-full flex flex-wrap content-start justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
-                </div>
+                        {/* Play/Pause Overlay */}
+                        {!isPlaying && (
+                            <div data-testid="play-overlay" className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
+                                <div className="bg-black/40 backdrop-blur-sm p-6 rounded-full border border-white/10 shadow-2xl">
+                                    <svg className="w-12 h-12 text-white/80 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-                {/* Scroll Zones */}
-                <div
-                    className="absolute top-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-center pt-4 text-xs font-mono text-magma-vent cursor-n-resize bg-gradient-to-b from-black/50 to-transparent pointer-events-auto"
-                    onMouseEnter={() => startScrolling('back')}
-                    onMouseLeave={stopScrolling}
-                >
-                    SCROLL BACK
-                </div>
-                <div
-                    className="absolute bottom-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 text-xs font-mono text-magma-vent cursor-s-resize bg-gradient-to-t from-black/50 to-transparent pointer-events-auto"
-                    onMouseEnter={() => startScrolling('fwd')}
-                    onMouseLeave={stopScrolling}
-                >
-                    SCROLL FWD
-                </div>
+                    {/* Bottom Zone: Next Context */}
+                    <div className="flex-1 w-full overflow-hidden relative mask-gradient-bottom">
+                        <div ref={nextContainerRef} className="w-full h-full flex flex-wrap content-start justify-start p-8 md:p-16 font-mono text-xl md:text-2xl leading-relaxed select-none overflow-hidden" onClick={handleRiverClick}></div>
+                    </div>
 
+                    {/* Scroll Zones */}
+                    <div
+                        className="absolute top-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-center pt-4 text-xs font-mono text-magma-vent cursor-n-resize bg-gradient-to-b from-black/50 to-transparent pointer-events-auto"
+                        onMouseEnter={() => startScrolling('back')}
+                        onMouseLeave={stopScrolling}
+                    >
+                        SCROLL BACK
+                    </div>
+                    <div
+                        className="absolute bottom-0 left-0 right-0 h-24 z-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 text-xs font-mono text-magma-vent cursor-s-resize bg-gradient-to-t from-black/50 to-transparent pointer-events-auto"
+                        onMouseEnter={() => startScrolling('fwd')}
+                        onMouseLeave={stopScrolling}
+                    >
+                        SCROLL FWD
+                    </div>
+
+                </div>
             </div>
 
             {/* Inspection Modal */}

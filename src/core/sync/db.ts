@@ -36,6 +36,12 @@ export type ChapterDocType = {
     lastChunkCompletedAt?: number;
     content: string[];
     densities?: number[];
+    subchapters?: {
+        title: string;
+        summary: string;
+        startWordIndex: number;
+        endWordIndex: number;
+    }[];
 };
 
 export type HighlightType = {
@@ -92,7 +98,7 @@ export const initDB = async (): Promise<MyDatabase> => {
         }
 
         const db = await createRxDatabase<MyDatabaseCollections>({
-            name: 'lalange_db_v7', // Bumped version/name to force fresh DB
+            name: 'lalange_db_v10', // Bumped version/name to force fresh DB
             storage,
             ignoreDuplicate: true
         });
@@ -119,4 +125,10 @@ export const initDB = async (): Promise<MyDatabase> => {
     })();
 
     return dbPromise;
+};
+
+export const resetDB = async () => {
+    const db = await initDB();
+    await db.remove();
+    window.location.reload();
 };

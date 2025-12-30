@@ -98,11 +98,13 @@ describe('Reader Component', () => {
             expect(screen.queryByText('INITIALIZING COCKPIT...')).not.toBeInTheDocument();
         });
 
-        // The word "Hello" should be split. Bionic for "Hello" (len 5) is 2 bold.
-        // Bold: "He", Light: "llo"
-        // We expect multiple because of the Flow view AND the RSVP view
-        expect(screen.getAllByText('He').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('llo').length).toBeGreaterThan(0);
+        // The word "Hello" should be split.
+        // In the new gradient implementation, "Hello" is split into individual characters for the first 4 in the RSVP view.
+        // H (900), e (800), l (700), l (600), o (light)
+
+        // Check RSVP container text content
+        const rsvpContainer = screen.getByTestId('rsvp-container');
+        expect(rsvpContainer).toHaveTextContent('Hello');
     });
 
     it('should display chapter title', async () => {
@@ -157,10 +159,10 @@ describe('Reader Component', () => {
             expect(elements.length).toBeGreaterThan(0);
         });
 
-        // Check if content updated to "Second" (Bionic for "Second" len 6 -> 3 bold)
-        // "Second" -> len 6 -> Bold "Sec", Light "ond"
-        expect(screen.getAllByText('Sec').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('ond').length).toBeGreaterThan(0);
+        // Check if content updated to "Second"
+        // Check RSVP container text content
+        const rsvpContainer = screen.getByTestId('rsvp-container');
+        expect(rsvpContainer).toHaveTextContent('Second');
     });
 
     it('should save progress when pausing', async () => {

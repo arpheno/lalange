@@ -26,12 +26,11 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         };
     }, []);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files?.[0]) return;
+    const ingestBook = async (file: File) => {
         setLoading(true);
         setStatus('Starting ingestion...');
         try {
-            const { book, chapters, images, rawFile } = await initialIngest(e.target.files[0], (msg: string) => setStatus(msg));
+            const { book, chapters, images, rawFile } = await initialIngest(file, (msg: string) => setStatus(msg));
             const db = await initDB();
             await db.books.insert(book);
             await db.chapters.bulkInsert(chapters);
@@ -55,6 +54,28 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
             console.error(err);
             alert(err.message || 'Failed to load book');
         } finally {
+            setLoading(false);
+            setStatus('');
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.[0]) return;
+        await ingestBook(e.target.files[0]);
+    };
+
+    const handleLoadDemo = async () => {
+        setLoading(true);
+        setStatus('Fetching demo book...');
+        try {
+            const res = await fetch('/test_book.epub');
+            if (!res.ok) throw new Error('Failed to fetch demo book');
+            const blob = await res.blob();
+            const file = new File([blob], 'test_book.epub', { type: 'application/epub+zip' });
+            await ingestBook(file);
+        } catch (e: any) {
+            console.error(e);
+            alert(e.message);
             setLoading(false);
             setStatus('');
         }
@@ -99,6 +120,13 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                                 {status}
                             </div>
                         )}
+                        <button
+                            onClick={handleLoadDemo}
+                            disabled={loading}
+                            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-sm font-mono text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                        >
+                            [ LOAD DEMO ]
+                        </button>
                         <label className="group relative cursor-pointer flex items-center justify-center px-6 py-3 font-mono font-bold text-sm tracking-widest transition-all bg-dune-gold text-black hover:bg-white w-full md:w-auto">
                             <span className="relative z-10 flex items-center gap-2">
                                 {loading ? 'INGESTING...' : 'UPLOAD EPUB'}

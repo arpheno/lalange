@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { type ChapterDocType } from '../../core/sync/db';
 import { formatReadingTime } from '../../hooks/useReadingTimeEstimate';
 import { clsx } from 'clsx';
@@ -6,7 +6,7 @@ import { clsx } from 'clsx';
 interface SidebarProps {
     chapters: ChapterDocType[];
     currentChapter: ChapterDocType | null;
-    onLoadChapter: (id: string) => void;
+    onLoadChapter: (id: string, wordIndex?: number) => void;
     onInspectChapter: (chapter: ChapterDocType) => void;
     wpm: number;
     className?: string;
@@ -20,6 +20,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     wpm,
     className
 }) => {
+    const [expandedSummary, setExpandedSummary] = useState<string | null>(null);
+
     // Calculate total stats
     const totalWords = chapters.reduce((acc, c) => acc + (c.content?.length || 0), 0);
     const totalTimeMinutes = totalWords / wpm;
@@ -28,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Calculate average ingest speed (from processing chapters)
     const processingChapters = chapters.filter(c => c.status === 'processing');
     const ingestSpeed = processingChapters.length > 0
-        ? Math.round(processingChapters.reduce((acc, c) => acc + (c.processingSpeed || 0), 0) / processingChapters.length)
+        ? Math.round(processingChapters.reduce((acc, c) => acc + (c.lastTPM || 0), 0) / processingChapters.length)
         : 0;
 
     const getChapterReadingTime = (chapter: ChapterDocType) => {
@@ -40,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         if (chapter.status === 'processing') {
-            const speed = chapter.processingSpeed || 0;
+            const speed = chapter.processingSpeed || 0; // WPM
             const lastChunkTime = chapter.lastChunkCompletedAt || 0;
 
             if (speed > 0 && lastChunkTime > 0) {
@@ -85,10 +87,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     else if (isProcessing) fillPercent = chapter.progress || 0;
 
                     return (
-                        <div key={chapter.id} className="relative group">
+                        <div key={chapter.id} className="relative group flex flex-col">
                             {/* Background Fill Bar */}
                             <div
-                                className="absolute inset-0 bg-white/5 transition-all duration-1000 ease-linear"
+                                className="absolute inset-0 bg-white/5 transition-all duration-1000 ease-linear pointer-events-none"
                                 style={{ width: `${fillPercent}%`, opacity: isCurrent ? 0.2 : 0.1 }}
                             />
 
@@ -114,7 +116,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             {readingTime || "PENDING"}
                                         </span>
                                         {isProcessing && (
-                                            <span className="text-gray-600">{chapter.processingSpeed} TPS</span>
+                                            <span className="text-gray-600">
+                                                {chapter.lastTPM ? `${chapter.lastTPM} TPM` : `${chapter.processingSpeed} WPM`}
+                                            </span>
                                         )}
                                     </div>
                                 </button>
@@ -132,27 +136,98 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     </svg>
                                 </button>
                             </div>
+
+                            {/* Subchapters */}
+                            {chapter.subchapters && chapter.subchapters.length > 0 && (
+                                <div className="pl-4 border-l border-white/10 ml-2 mb-2 space-y-2">
+                                    {chapter.subchapters.map((sub, idx) => {
+                                        const summaryId = `${chapter.id}_${idx}`;
+                                        const isExpanded = expandedSummary === summaryId;
+                                        // Check if we have ANY content for this subchapter (start index exists in content array)
+                                        const currentContentLength = chapter.content?.length || 0;
+                                        const hasStarted = currentContentLength > sub.startWordIndex;
+                                        const isFullyReady = currentContentLength >= sub.endWordIndex;
+
+                                        // Safe to read if user WPM is slower than processing speed (or if fully ready)
+                                        const processingSpeed = chapter.processingSpeed || 0;
+                                        const isSafeSpeed = wpm < processingSpeed;
+                                        const isSafeToRead = isFullyReady || (hasStarted && isSafeSpeed);
+
+                                        return (
+                                            <div key={idx} className="flex flex-col relative group/sub">
+                                                {/* Health Bar Background */}
+                                                <div
+                                                    className={clsx(
+                                                        "absolute inset-0 transition-all duration-1000 ease-out rounded-sm",
+                                                        isFullyReady ? "opacity-0" : "opacity-100 animate-pulse",
+                                                        isSafeToRead ? "bg-canarian-pine/20" : "bg-dune-gold/10"
+                                                    )}
+                                                    style={{
+                                                        width: '100%',
+                                                    }}
+                                                />
+
+                                                <div className="flex items-center justify-between relative z-10 pl-1">
+                                                    <button
+                                                        className={clsx(
+                                                            "flex-1 text-left text-[10px] py-1 transition-colors truncate pr-2",
+                                                            isFullyReady ? "text-gray-500 hover:text-dune-gold" : (isSafeToRead ? "text-canarian-pine font-bold" : "text-dune-gold font-bold")
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setExpandedSummary(isExpanded ? null : summaryId);
+                                                        }}
+                                                    >
+                                                        {sub.title} {!isFullyReady && "..."}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (hasStarted) {
+                                                                onLoadChapter(chapter.id, sub.startWordIndex);
+                                                            }
+                                                        }}
+                                                        disabled={!hasStarted}
+                                                        className={clsx(
+                                                            "p-1 rounded hover:bg-white/10 transition-colors",
+                                                            hasStarted ? "text-dune-gold" : "text-gray-600 opacity-50 cursor-not-allowed"
+                                                        )}
+                                                        title="Read Subchapter"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+
+                                                {isExpanded && (
+                                                    <div className="text-[10px] text-gray-400 italic bg-black/20 p-2 rounded border border-white/5 mb-1 animate-in fade-in slide-in-from-top-1 relative z-10">
+                                                        {sub.summary}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </div>
 
             {/* Telemetry Footer */}
-            <div className="p-3 border-t border-white/10 bg-black/20 text-[10px] space-y-2">
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-500">NEURAL ENGINE</span>
-                    <span className="text-magma-vent">[LLAMA-3-8B]</span>
+            <div className="p-4 border-t border-white/10 bg-black/40">
+                <div className="text-[10px] text-gray-500 tracking-widest mb-1">SYSTEM VELOCITY</div>
+                <div className="text-2xl font-mono text-dune-gold flex items-baseline gap-2">
+                    {ingestSpeed > 0 ? ingestSpeed : "IDLE"} <span className="text-xs text-gray-600">TPM</span>
                 </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-500">INGEST VELOCITY</span>
-                    <span className={ingestSpeed > 0 ? "text-dune-gold animate-pulse" : "text-gray-700"}>
-                        {ingestSpeed > 0 ? `~${ingestSpeed} TPS` : "IDLE"}
-                    </span>
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-500">BUFFER STATUS</span>
-                    <span className="text-canarian-pine">OPTIMAL</span>
-                </div>
+                {ingestSpeed > 0 && (
+                    <div className="text-[10px] text-gray-600 mt-1">
+                        ~{(ingestSpeed / 60).toFixed(1)} TPS
+                    </div>
+                )}
             </div>
         </div>
     );
