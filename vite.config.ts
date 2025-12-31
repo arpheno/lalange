@@ -14,8 +14,8 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
       },
       manifest: {
-        name: "Lalange",
-        short_name: "Lalange",
+        name: "Arphen",
+        short_name: "Arphen",
         start_url: "/",
         display: "standalone",
         background_color: "#000000",
