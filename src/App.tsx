@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { Library } from './components/Library/Library'
 import { Reader } from './components/Reader/Reader'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
+import { Manifesto } from './components/Manifesto'
 import type { BookDocType } from './core/sync/db'
 import { useSettingsStore } from './core/store/settings'
 import { useAIStore } from './core/store/ai'
 import { clsx } from 'clsx'
 
-type ViewState = 'library' | 'reader' | 'settings';
+type ViewState = 'library' | 'reader' | 'settings' | 'manifesto';
 
 function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
@@ -48,7 +49,7 @@ function App() {
     )}>
       <div className="w-full flex justify-between items-center p-4 border-b border-white/10 bg-black/20 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
+          <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">ARPHEN</h1>
           {aiState.activity && (
             <div className="hidden md:flex items-center gap-2 text-[10px] text-dune-gold font-mono border border-dune-gold/20 px-2 py-1 rounded bg-dune-gold/5 animate-in fade-in slide-in-from-left-2">
               <span className="animate-pulse">●</span>
@@ -65,17 +66,19 @@ function App() {
             [ {view === 'settings' ? 'CLOSE_SETTINGS' : 'SETTINGS'} ]
           </button>
         </div>
-        {view !== 'library' && (
-          <button
-            onClick={() => {
-              setCurrentBook(null);
-              setView('library');
-            }}
-            className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            [ BACK_TO_LIBRARY ]
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {view !== 'library' && view !== 'manifesto' && (
+            <button
+              onClick={() => {
+                setCurrentBook(null);
+                setView('library');
+              }}
+              className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              [ BACK_TO_LIBRARY ]
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 w-full overflow-auto flex justify-center relative">
@@ -84,6 +87,8 @@ function App() {
 
         {view === 'settings' ? (
           <SettingsPanel onClose={handleCloseSettings} />
+        ) : view === 'manifesto' ? (
+          <Manifesto onBack={() => setView('library')} />
         ) : view === 'reader' && currentBook ? (
           <Reader
             book={currentBook}
@@ -92,6 +97,16 @@ function App() {
         ) : (
           <Library onOpenBook={setCurrentBook} />
         )}
+      </div>
+
+      {/* Made by Arphen Corner Label */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <button
+          onClick={() => setView('manifesto')}
+          className="text-[10px] font-mono text-white/30 hover:text-lacan-red transition-colors tracking-widest uppercase"
+        >
+          Made by Arphen
+        </button>
       </div>
     </div>
   )
