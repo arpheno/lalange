@@ -2,8 +2,8 @@ import { CreateMLCEngine, MLCEngine, type InitProgressCallback, hasModelInCache,
 import { useAIStore } from "../store/ai";
 
 export const MODEL_MAPPING = {
-    tiny: "Llama-3-8B-Instruct-q4f16_1-MLC",
-    balanced: "Llama-3-8B-Instruct-q4f16_1-MLC",
+    tiny: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+    balanced: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     pro: "Llama-3-8B-Instruct-q4f16_1-MLC"
 } as const;
 
@@ -15,27 +15,33 @@ let currentLoadedModel: string | null = null;
 export const getEngine = async (
     tier: ModelTier
 ): Promise<MLCEngine> => {
-    // FORCE SINGLE MODEL ARCHITECTURE
-    // We strictly enforce using only one model ID and never reloading/switching.
-    const modelId = "Llama-3-8B-Instruct-q4f16_1-MLC";
+    // Resolve the model ID based on the requested tier
+    const modelId = MODEL_MAPPING[tier];
     const { setProgress, setLoading, setReady } = useAIStore.getState();
 
     const onProgress: InitProgressCallback = (report) => {
-        setProgress(`[SINGLE-MODEL] (${modelId}) ${report.text}`, report.progress);
+        setProgress(`[${tier.toUpperCase()}] ${report.text}`, report.progress);
     };
 
     // If an engine exists, return it immediately.
-    // We DO NOT check if the modelId matches, because we refuse to switch models.
+    // We currently enforce a single-model session to avoid VRAM fragmentation.
+    // If the user wants to switch models, they must reload the page (or we implement a full unload).
     if (engineInstance) {
+        if (currentLoadedModel !== modelId) {
+            console.warn(`[WebLLM] Requested ${modelId} but ${currentLoadedModel} is already loaded. Using loaded model.`);
+        }
         return engineInstance;
     }
 
-    setLoading(true, "Llama-3-8B");
+    setLoading(true, modelId);
     setReady(false);
 
     try {
-        // Always create, never reload since we only do this once.
-        engineInstance = await CreateMLCEngine(modelId, { initProgressCallback: onProgress });
+        console.log(`[WebLLM] Initializing engine with model: ${modelId}`);
+        engineInstance = await CreateMLCEngine(modelId, { 
+            initProgressCallback: onProgress,
+            logLevel: "INFO" // Enable logging to help debug
+        });
         currentLoadedModel = modelId;
         setReady(true);
         return engineInstance;
