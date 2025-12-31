@@ -30,6 +30,7 @@ export const getEngine = async (
             setLoading(true, modelId);
             setReady(false);
             try {
+                // @ts-ignore - reload options type definition might be missing in current version
                 await engineInstance.reload(modelId, { initProgressCallback: onProgress });
                 currentLoadedModel = modelId;
                 setReady(true);
