@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { type BookDocType, type ChapterDocType, type ReadingStateDocType, initDB, resetDB } from '../../core/sync/db';
+import { type BookDocType, type ChapterDocType, type ReadingStateDocType, initDB } from '../../core/sync/db';
 import { getBionicSplit, getBionicGradientHtml } from '../../core/rsvp/bionic';
 import { getPunctuationDelay } from '../../core/rsvp/timing';
 import { Sidebar } from './Sidebar';
@@ -27,7 +27,6 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
     const [, setTick] = useState(0); // Force re-render for live time updates
 
-    const containerRef = useRef<HTMLDivElement>(null);
     const prevContainerRef = useRef<HTMLDivElement>(null);
     const nextContainerRef = useRef<HTMLDivElement>(null);
     const rsvpRef = useRef<HTMLDivElement>(null);
@@ -227,22 +226,6 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
             if (chapterSubRef.current) chapterSubRef.current.unsubscribe();
         };
     }, []);
-
-    const handleNextChapter = () => {
-        if (!currentChapter) return;
-        const currentIndex = chapters.findIndex(c => c.id === currentChapter.id);
-        if (currentIndex < chapters.length - 1) {
-            loadChapter(chapters[currentIndex + 1].id);
-        }
-    };
-
-    const handlePrevChapter = () => {
-        if (!currentChapter) return;
-        const currentIndex = chapters.findIndex(c => c.id === currentChapter.id);
-        if (currentIndex > 0) {
-            loadChapter(chapters[currentIndex - 1].id);
-        }
-    };
 
     const scrollIntervalRef = useRef<any>(null);
     const scrollStartTimeRef = useRef<number>(0);
@@ -498,16 +481,6 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
         }
 
         requestRef.current = requestAnimationFrame(loop);
-    };
-
-    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newIndex = parseInt(e.target.value);
-        indexRef.current = newIndex;
-        setCurrentWordIndex(newIndex);
-        renderWord(newIndex, wordsRef.current);
-        if (!isPlaying) {
-            saveProgress();
-        }
     };
 
     const getDensityColor = (score: number) => {

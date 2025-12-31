@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { type ModelTier } from '../ai/webllm';
 
 export type ThemeMode = 'volcanic' | 'dunes' | 'ash';
+
+export interface PromptFragment {
+    id: string;
+    label: string;
+    text: string;
+    enabled: boolean;
+}
 
 interface SettingsState {
     // Appearance
@@ -34,7 +42,15 @@ interface SettingsState {
     manualOverrideRules: string;
     setManualOverrideRules: (rules: string) => void;
 
-    // Transformation
+    // Transformation (Editor)
+    editorModel: ModelTier;
+    setEditorModel: (model: ModelTier) => void;
+    editorBasePrompt: string;
+    setEditorBasePrompt: (prompt: string) => void;
+    editorFragments: PromptFragment[];
+    toggleEditorFragment: (id: string) => void;
+
+    // Legacy Transformation
     llmModel: 'tiny' | 'balanced' | 'pro';
     setLlmModel: (model: 'tiny' | 'balanced' | 'pro') => void;
     autoUpgradeEngine: boolean;
@@ -53,15 +69,37 @@ interface SettingsState {
     setPacingSensitivity: (sensitivity: number) => void;
 
     // Librarian
+    librarianModelTier: ModelTier;
+    setLibrarianModelTier: (model: ModelTier) => void;
+    librarianBasePrompt: string;
+    setLibrarianBasePrompt: (prompt: string) => void;
+    librarianFragments: PromptFragment[];
+    toggleLibrarianFragment: (id: string) => void;
+
+    // Legacy Librarian
     librarianModel: 'mistral' | 'llama' | 'other';
     setLibrarianModel: (model: 'mistral' | 'llama' | 'other') => void;
 
-    // AI / Summarization
+    // Summarizer
+    summarizerModel: ModelTier;
+    setSummarizerModel: (model: ModelTier) => void;
+    summarizerBasePrompt: string;
+    setSummarizerBasePrompt: (prompt: string) => void;
+    summarizerFragments: PromptFragment[];
+    toggleSummarizerFragment: (id: string) => void;
+
+    // Legacy Summarizer
     summaryChunkSize: number;
     setSummaryChunkSize: (size: number) => void;
     summaryPrompt: string;
     setSummaryPrompt: (prompt: string) => void;
 }
+
+const defaultFragments: PromptFragment[] = [
+    { id: 'concise', label: 'Concise Mode', text: 'Keep the output concise and to the point.', enabled: false },
+    { id: 'simple', label: 'Simple English', text: 'Use simple vocabulary and short sentences.', enabled: false },
+    { id: 'creative', label: 'Creative Flourish', text: 'Use evocative and creative language.', enabled: false },
+];
 
 export const useSettingsStore = create<SettingsState>()(
     persist(
@@ -93,6 +131,17 @@ export const useSettingsStore = create<SettingsState>()(
             manualOverrideRules: '',
             setManualOverrideRules: (manualOverrideRules) => set({ manualOverrideRules }),
 
+            // Editor Defaults
+            editorModel: 'balanced',
+            setEditorModel: (editorModel) => set({ editorModel }),
+            editorBasePrompt: 'You are an expert editor. Rewrite the following text to improve clarity and flow.',
+            setEditorBasePrompt: (editorBasePrompt) => set({ editorBasePrompt }),
+            editorFragments: [...defaultFragments],
+            toggleEditorFragment: (id) => set((state) => ({
+                editorFragments: state.editorFragments.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
+            })),
+
+            // Legacy Editor
             llmModel: 'tiny',
             setLlmModel: (llmModel) => set({ llmModel }),
             autoUpgradeEngine: true,
@@ -109,9 +158,31 @@ export const useSettingsStore = create<SettingsState>()(
             pacingSensitivity: 50,
             setPacingSensitivity: (pacingSensitivity) => set({ pacingSensitivity }),
 
+            // Librarian Defaults
+            librarianModelTier: 'tiny',
+            setLibrarianModelTier: (librarianModelTier) => set({ librarianModelTier }),
+            librarianBasePrompt: 'You are a helpful librarian. Analyze the text and provide recommendations.',
+            setLibrarianBasePrompt: (librarianBasePrompt) => set({ librarianBasePrompt }),
+            librarianFragments: [...defaultFragments],
+            toggleLibrarianFragment: (id) => set((state) => ({
+                librarianFragments: state.librarianFragments.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
+            })),
+
+            // Legacy Librarian
             librarianModel: 'mistral',
             setLibrarianModel: (librarianModel) => set({ librarianModel }),
 
+            // Summarizer Defaults
+            summarizerModel: 'tiny',
+            setSummarizerModel: (summarizerModel) => set({ summarizerModel }),
+            summarizerBasePrompt: 'Summarize the following text in 5 sentences.',
+            setSummarizerBasePrompt: (summarizerBasePrompt) => set({ summarizerBasePrompt }),
+            summarizerFragments: [...defaultFragments],
+            toggleSummarizerFragment: (id) => set((state) => ({
+                summarizerFragments: state.summarizerFragments.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
+            })),
+
+            // Legacy Summarizer
             summaryChunkSize: 2500,
             setSummaryChunkSize: (summaryChunkSize) => set({ summaryChunkSize }),
 

@@ -54,6 +54,6 @@ test-ollama: start-ollama
 # Backwards-compatible alias
 ollama-test: test-ollama
 
-dev: start-ollama
+dev:
 	@echo "Starting Vite development server..."
 	@npm run dev

@@ -22,7 +22,7 @@ For each function of the
 *The JIT (Just-In-Time) compiler for the style and tone of your feed.*
 
 * **Model Selection:**  
-  * **Tier 1:** *Tiny* (Qwen-0.5B) – For instant, low-power cleaning.  
+  * **Tier 1:** *Tiny* (Llama-3.2-1B) – For instant, low-power cleaning.  
   * **Tier 2:** *Balanced* (Llama-3.2-3B) – For nuanced editing and light styling.  
   * **Tier 3:** *Pro* (Llama-3-8B / Mistral-7B) – For deep "Jack Sparrow" style transformations.  
 * **\[Toggle\] Auto-Upgrade Neural Engine:** Starts with a Tiny model for Chapter 1 and silently swaps to a Pro model once the 4GB buffer is downloaded.  

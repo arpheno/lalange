@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
+      },
       manifest: {
         name: "Lalange",
         short_name: "Lalange",
@@ -22,4 +25,7 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    host: true
+  }
 })

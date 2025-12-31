@@ -1,0 +1,31 @@
+import { generateWebLLMCompletion, getEngine, type ModelTier } from './webllm';
+import { useSettingsStore } from '../store/settings';
+
+export const checkAIHealth = async (modelTier?: ModelTier): Promise<boolean> => {
+    const { llmModel } = useSettingsStore.getState();
+    const targetModel = modelTier || (llmModel as ModelTier);
+
+    // For WebLLM, we assume it's healthy if we can load the engine.
+    // But loading might take time.
+    // We can try to get the engine, which will trigger loading if needed.
+    try {
+        await getEngine(targetModel);
+        return true;
+    } catch (e) {
+        console.error("WebLLM Health Check Failed:", e);
+        return false;
+    }
+};
+
+export interface AICompletionResult {
+    response: string;
+    metrics?: any;
+}
+
+export const generateUnifiedCompletion = async (prompt: string, modelTier?: ModelTier): Promise<{ response: string, metrics?: any }> => {
+    const { llmModel } = useSettingsStore.getState();
+    const targetModel = modelTier || (llmModel as ModelTier);
+
+    const result = await generateWebLLMCompletion(prompt, targetModel);
+    return { response: result.response, metrics: result.usage };
+};

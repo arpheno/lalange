@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { analyzeDensityRange } from './pipeline';
-import { generateCompletion } from '../ai/ollama';
+import { generateUnifiedCompletion } from '../ai/service';
 
 // Mock dependencies
-vi.mock('../ai/ollama', () => ({
-    checkOllamaHealth: vi.fn().mockResolvedValue(true),
-    generateCompletion: vi.fn(),
+vi.mock('../ai/service', () => ({
+    checkAIHealth: vi.fn().mockResolvedValue(true),
+    generateUnifiedCompletion: vi.fn(),
 }));
 
 describe('analyzeDensityRange', () => {
@@ -14,7 +14,7 @@ describe('analyzeDensityRange', () => {
     });
 
     it('should return default densities if LLM fails', async () => {
-        (generateCompletion as any).mockRejectedValue(new Error('LLM Error'));
+        (generateUnifiedCompletion as any).mockRejectedValue(new Error('LLM Error'));
         const words = ['hello', 'world'];
         const densities = await analyzeDensityRange(words);
         // Default score is 5 -> factor 1.0
@@ -24,11 +24,13 @@ describe('analyzeDensityRange', () => {
     it('should parse valid JSON from LLM and calculate density factors', async () => {
         // "hello world" -> score 10 -> factor 1.5
         // "simple text" -> score 1 -> factor 0.6
-        const mockResponse = JSON.stringify({
-            "hello world .": 10,
-            "simple text .": 1
-        });
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        const mockResponse = {
+            response: JSON.stringify({
+                "hello world": 10,
+                "simple text": 1
+            })
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['hello', 'world', '.', 'simple', 'text', '.'];
         const densities = await analyzeDensityRange(words);
@@ -43,10 +45,12 @@ describe('analyzeDensityRange', () => {
 
     it('should handle partial matches', async () => {
         // Only one sentence matched
-        const mockResponse = JSON.stringify({
-            "hello world .": 10
-        });
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        const mockResponse = {
+            response: JSON.stringify({
+                "hello world": 10
+            })
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['hello', 'world', '.', 'unknown', 'part', '.'];
         const densities = await analyzeDensityRange(words);
@@ -61,10 +65,12 @@ describe('analyzeDensityRange', () => {
     it('should match text with punctuation to clean keys from LLM', async () => {
         // Source: "Hello, world!"
         // LLM Output: "Hello world": 10 (Clean key)
-        const mockResponse = JSON.stringify({
-            "Hello world": 10
-        });
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        const mockResponse = {
+            response: JSON.stringify({
+                "Hello world": 10
+            })
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['Hello,', 'world!'];
         const densities = await analyzeDensityRange(words);
@@ -77,10 +83,12 @@ describe('analyzeDensityRange', () => {
     it('should match text even if LLM returns dirty keys (robustness)', async () => {
         // Source: "Hello, world!"
         // LLM Output: "Hello, world!": 10 (Dirty key, ignored instruction)
-        const mockResponse = JSON.stringify({
-            "Hello, world!": 10
-        });
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        const mockResponse = {
+            response: JSON.stringify({
+                "Hello, world!": 10
+            })
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['Hello,', 'world!'];
         const densities = await analyzeDensityRange(words);
@@ -91,7 +99,8 @@ describe('analyzeDensityRange', () => {
     });
 
     it('should extract JSON from conversational LLM response', async () => {
-        const mockResponse = `
+        const mockResponse = {
+            response: `
 Here is the analysis you requested:
 
 \`\`\`json
@@ -101,8 +110,9 @@ Here is the analysis you requested:
 \`\`\`
 
 I hope this helps!
-        `;
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        `
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['Simple', 'sentence', '.'];
         const densities = await analyzeDensityRange(words);
@@ -113,10 +123,12 @@ I hope this helps!
 
     it('should fix smart quotes in JSON', async () => {
         // LLM returns smart quotes “ ” instead of " "
-        const mockResponse = `{
+        const mockResponse = {
+            response: `{
             “Smart quotes”: 10
-        }`;
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        }`
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['Smart', 'quotes', '.'];
         const densities = await analyzeDensityRange(words);
@@ -127,11 +139,13 @@ I hope this helps!
 
     it('should handle truncated JSON response by appending closing brace', async () => {
         // Simulate a truncated response (missing closing brace)
-        const truncatedResponse = `{
+        const truncatedResponse = {
+            response: `{
             "The quick brown fox": 5,
-            "Jumps over the lazy dog": 2`;
+            "Jumps over the lazy dog": 2`
+        };
 
-        (generateCompletion as any).mockResolvedValue(truncatedResponse);
+        (generateUnifiedCompletion as any).mockResolvedValue(truncatedResponse);
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -149,11 +163,13 @@ I hope this helps!
 
     it('should handle truncated JSON response with trailing comma', async () => {
         // Simulate a truncated response with trailing comma
-        const truncatedResponse = `{
+        const truncatedResponse = {
+            response: `{
             "The quick brown fox": 5,
-            "Jumps over the lazy dog": 2,`;
+            "Jumps over the lazy dog": 2,`
+        };
 
-        (generateCompletion as any).mockResolvedValue(truncatedResponse);
+        (generateUnifiedCompletion as any).mockResolvedValue(truncatedResponse);
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -165,12 +181,14 @@ I hope this helps!
     it('should tolerate invalid JSON with unescaped quotes inside keys', async () => {
         // This is NOT valid JSON because the key contains an unescaped quote.
         // We still want to recover scores from it.
-        const invalidJsonish = `{
+        const invalidJsonish = {
+            response: `{
   "" he thought": 1,
   "It wasn’t a dream": 2
-}`;
+}`
+        };
 
-        (generateCompletion as any).mockResolvedValue(invalidJsonish);
+        (generateUnifiedCompletion as any).mockResolvedValue(invalidJsonish);
 
         const words = ['""', 'he', 'thought.', 'It', 'wasn’t', 'a', 'dream.'];
         const densities = await analyzeDensityRange(words);
@@ -182,11 +200,13 @@ I hope this helps!
     });
 
     it('should assign 0 density for junk/structural elements', async () => {
-        const mockResponse = JSON.stringify({
-            "Page 12": 0,
-            "Chapter 5": 0
-        });
-        (generateCompletion as any).mockResolvedValue(mockResponse);
+        const mockResponse = {
+            response: JSON.stringify({
+                "Page 12": 0,
+                "Chapter 5": 0
+            })
+        };
+        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
 
         const words = ['Page', '12', '.', 'Chapter', '5', '.'];
         const densities = await analyzeDensityRange(words);

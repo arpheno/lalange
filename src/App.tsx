@@ -4,6 +4,7 @@ import { Reader } from './components/Reader/Reader'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import type { BookDocType } from './core/sync/db'
 import { useSettingsStore } from './core/store/settings'
+import { useAIStore } from './core/store/ai'
 import { clsx } from 'clsx'
 
 type ViewState = 'library' | 'reader' | 'settings';
@@ -12,6 +13,7 @@ function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
   const [view, setView] = useState<ViewState>('library')
   const { theme } = useSettingsStore()
+  const aiState = useAIStore()
 
   // Sync view state with book selection
   useEffect(() => {
@@ -47,6 +49,12 @@ function App() {
       <div className="w-full flex justify-between items-center p-4 border-b border-white/10 bg-black/20 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">LALANGE</h1>
+          {aiState.activity && (
+            <div className="hidden md:flex items-center gap-2 text-[10px] text-dune-gold font-mono border border-dune-gold/20 px-2 py-1 rounded bg-dune-gold/5 animate-in fade-in slide-in-from-left-2">
+              <span className="animate-pulse">●</span>
+              <span className="uppercase tracking-wider">{aiState.activity}</span>
+            </div>
+          )}
           <button
             onClick={() => setView(view === 'settings' ? (currentBook ? 'reader' : 'library') : 'settings')}
             className={clsx(

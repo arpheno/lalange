@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { analyzeDensityRange } from './pipeline';
-import * as ollama from '../ai/ollama';
+import * as service from '../ai/service';
 
-vi.mock('../ai/ollama', () => ({
-    generateCompletion: vi.fn(),
-    checkOllamaHealth: vi.fn().mockResolvedValue(true)
+vi.mock('../ai/service', () => ({
+    generateUnifiedCompletion: vi.fn(),
+    checkAIHealth: vi.fn().mockResolvedValue(true)
 }));
 
 describe('Pipeline Parsing Logic', () => {
@@ -18,7 +18,7 @@ describe('Pipeline Parsing Logic', () => {
             "The quick brown fox": 5,
             "Jumps over the lazy dog": 2`;
 
-        vi.mocked(ollama.generateCompletion).mockResolvedValue(truncatedResponse);
+        vi.mocked(service.generateUnifiedCompletion).mockResolvedValue({ response: truncatedResponse });
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -40,7 +40,7 @@ describe('Pipeline Parsing Logic', () => {
             "The quick brown fox": 5,
             "Jumps over the lazy dog": 2,`;
 
-        vi.mocked(ollama.generateCompletion).mockResolvedValue(truncatedResponse);
+        vi.mocked(service.generateUnifiedCompletion).mockResolvedValue({ response: truncatedResponse });
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -55,7 +55,7 @@ describe('Pipeline Parsing Logic', () => {
             "Jumps over the lazy dog": 2
         }`;
 
-        vi.mocked(ollama.generateCompletion).mockResolvedValue(validResponse);
+        vi.mocked(service.generateUnifiedCompletion).mockResolvedValue({ response: validResponse });
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);

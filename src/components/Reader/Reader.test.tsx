@@ -146,41 +146,46 @@ describe('Reader Component', () => {
             expect(elements.length).toBeGreaterThan(0);
         });
 
-        // Open settings
-        const settingsBtn = screen.getByTestId('settings-button');
-        fireEvent.click(settingsBtn);
+        // Open Sidebar
+        const chaptersBtn = screen.getByTitle('Chapters');
+        fireEvent.click(chaptersBtn);
 
-        // Click next chapter
-        const nextBtn = screen.getByTestId('next-chapter-button');
-        fireEvent.click(nextBtn);
+        // Click Chapter 2 in sidebar
+        // The sidebar renders buttons for chapters. We can find it by text.
+        // Note: The sidebar might be rendering "Chapter 2" inside a button.
+        const chapter2Btn = screen.getByText('Chapter 2').closest('button');
+        expect(chapter2Btn).toBeInTheDocument();
+        fireEvent.click(chapter2Btn!);
 
         await waitFor(() => {
-            const elements = screen.getAllByText('Chapter 2');
-            expect(elements.length).toBeGreaterThan(0);
+            // Check if content updated to "Second"
+            const rsvpContainer = screen.getByTestId('rsvp-container');
+            expect(rsvpContainer).toHaveTextContent('Second');
         });
-
-        // Check if content updated to "Second"
-        // Check RSVP container text content
-        const rsvpContainer = screen.getByTestId('rsvp-container');
-        expect(rsvpContainer).toHaveTextContent('Second');
     });
 
     it('should save progress when pausing', async () => {
-        render(<Reader book={mockBook} />);
+        const { container } = render(<Reader book={mockBook} />);
         await waitFor(() => {
             expect(screen.getByTestId('play-overlay')).toBeInTheDocument();
         });
 
-        // Open settings to access slider
-        const settingsBtn = screen.getByTestId('settings-button');
-        fireEvent.click(settingsBtn);
+        // Simulate clicking a word in the "River of Text" (Next Context)
+        // The words are rendered with data-index attributes
+        // We want to click the word at index 2 ("this")
 
-        // Change slider
-        const progressSlider = screen.getByRole('slider', { name: 'Progress' });
+        // We need to wait for the next context to be rendered
+        await waitFor(() => {
+            const wordSpan = container.querySelector('[data-index="2"]');
+            expect(wordSpan).toBeInTheDocument();
+        });
 
-        fireEvent.change(progressSlider, { target: { value: '2' } });
+        const wordSpan = container.querySelector('[data-index="2"]');
+        expect(wordSpan).not.toBeNull();
 
-        // Changing slider calls saveProgress if not playing
+        fireEvent.click(wordSpan!);
+
+        // Clicking a word jumps to it and pauses (calls saveProgress)
         await waitFor(() => {
             expect(mockReadingState.incrementalPatch).toHaveBeenCalledWith(expect.objectContaining({
                 currentWordIndex: 2

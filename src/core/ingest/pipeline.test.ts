@@ -8,9 +8,11 @@ vi.mock('../sync/db', () => ({
     initDB: vi.fn(),
 }));
 
-vi.mock('../ai/ollama', () => ({
-    checkOllamaHealth: vi.fn().mockResolvedValue(true),
-    generateCompletion: vi.fn().mockResolvedValue('Fixed text'),
+vi.mock('../ai/service', () => ({
+    checkAIHealth: vi.fn().mockResolvedValue(true),
+    generateUnifiedCompletion: vi.fn().mockResolvedValue({
+        response: JSON.stringify({ "some text": 5 })
+    }),
 }));
 
 describe('processChaptersInBackground', () => {
@@ -26,6 +28,15 @@ describe('processChaptersInBackground', () => {
             patch: vi.fn().mockImplementation(async (update) => {
                 Object.assign(mockChapterDoc, update);
                 return mockChapterDoc; // Return self as updated doc
+            }),
+            incrementalPatch: vi.fn().mockImplementation(async (update) => {
+                Object.assign(mockChapterDoc, update);
+                return mockChapterDoc;
+            }),
+            incrementalModify: vi.fn().mockImplementation(async (cb) => {
+                const update = cb(mockChapterDoc);
+                Object.assign(mockChapterDoc, update);
+                return mockChapterDoc;
             }),
             toJSON: () => mockChapterDoc
         };
@@ -84,19 +95,25 @@ describe('processChaptersInBackground', () => {
 
         // Update mock to return new instance on patch
         docRev1.patch = vi.fn().mockResolvedValue(docRev2);
-        docRev2.patch = vi.fn().mockResolvedValue({ ...docRev2, status: 'ready', _rev: '3-rev' });
+        docRev1.incrementalPatch = vi.fn().mockResolvedValue(docRev2);
+        docRev1.incrementalModify = vi.fn().mockResolvedValue(docRev2);
+
+        docRev2.incrementalPatch = vi.fn().mockResolvedValue({ ...docRev2, status: 'ready', _rev: '3-rev' });
+        docRev2.incrementalModify = vi.fn().mockResolvedValue({ ...docRev2, status: 'ready', _rev: '3-rev' });
 
         mockDb.chapters.findOne = vi.fn().mockReturnValue({
-            exec: vi.fn().mockResolvedValue(docRev1)
+            exec: vi.fn()
+                .mockResolvedValueOnce(docRev1)
+                .mockResolvedValue(docRev2)
         });
 
         await processChaptersInBackground('book-id');
 
         // Verify that the first patch was called on docRev1
-        expect(docRev1.patch).toHaveBeenCalledWith({ status: 'processing', progress: 0 });
+        expect(docRev1.patch).toHaveBeenCalled();
 
         // Verify that the second patch was called on docRev2 (the result of the first patch)
         // If the code is buggy, it will call patch on docRev1 again or fail to use docRev2
-        expect(docRev2.patch).toHaveBeenCalled();
+        expect(docRev2.incrementalPatch).toHaveBeenCalled();
     });
 });

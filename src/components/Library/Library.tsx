@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
 import { initialIngest, processChaptersInBackground } from '../../core/ingest/pipeline';
+import { useAIStore } from '../../core/store/ai';
 import { BookCard } from './BookCard';
 
 interface LibraryProps {
@@ -11,6 +12,7 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     const [books, setBooks] = useState<BookDocType[]>([]);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
+    const aiState = useAIStore();
 
     useEffect(() => {
         let sub: any;
@@ -114,10 +116,10 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                     </div>
 
                     <div className="flex items-center gap-6 w-full md:w-auto">
-                        {status && (
+                        {(status || aiState.isLoading) && (
                             <div className="flex items-center gap-2 text-magma-vent font-mono text-xs animate-pulse">
                                 <span className="w-2 h-2 bg-magma-vent rounded-full"></span>
-                                {status}
+                                {aiState.isLoading ? (aiState.progress || 'Initializing AI...') : status}
                             </div>
                         )}
                         <button

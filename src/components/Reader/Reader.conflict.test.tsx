@@ -138,10 +138,21 @@ describe('Reader Component - Conflict Handling', () => {
         });
 
         // Start playing
-        fireEvent.click(screen.getByText('ENGAGE'));
-        expect(screen.getByText('HALT')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('rsvp-container'));
+        await waitFor(() => {
+            expect(screen.queryByTestId('play-overlay')).not.toBeInTheDocument();
+        });
 
         // Click Next Chapter while playing
+        // Open Sidebar
+        const chaptersBtn = screen.getByTitle('Chapters');
+        fireEvent.click(chaptersBtn);
+
+        // Click Chapter 2 in sidebar
+        const chapter2Btn = screen.getByText('Chapter 2').closest('button');
+        expect(chapter2Btn).toBeInTheDocument();
+        fireEvent.click(chapter2Btn!);
+
         // This triggers:
         // 1. setIsPlaying(false) -> triggers saveProgress (async)
         // 2. loadChapter -> fetches doc, tries to patch
@@ -183,9 +194,6 @@ describe('Reader Component - Conflict Handling', () => {
 
         // To force this interleaving in the test, we can delay the findOne resolution in loadChapter?
         // But findOne is called multiple times.
-
-        const nextButton = screen.getByText('Next Sequence >');
-        fireEvent.click(nextButton);
 
         // We expect the chapter to change eventually
         await waitFor(() => {

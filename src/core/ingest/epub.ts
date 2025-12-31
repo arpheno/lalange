@@ -1,4 +1,5 @@
 import ePub from 'epubjs';
+import { generateUUID } from '../../utils/uuid';
 import type { BookDocType, ChapterDocType } from '../sync/db';
 
 export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapters: ChapterDocType[] }> => {
@@ -25,7 +26,7 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
         console.warn('Failed to load cover', e);
     }
 
-    const bookId = crypto.randomUUID();
+    const bookId = generateUUID();
     const chapters: ChapterDocType[] = [];
     let totalWords = 0;
 

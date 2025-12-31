@@ -9,10 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest --exclude '**/*.integration.test.ts'",
-    "test:ollama": "vitest run integration",
+    "test:integration": "vitest run integration",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.80",
     "cheerio": "^1.1.2",
     "clsx": "^2.1.1",
     "dexie": "^4.2.1",
