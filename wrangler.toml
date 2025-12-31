@@ -1,12 +1,4 @@
-name = "lalange"
+name = "arphen"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "dist"
 
-[site]
-bucket = "./dist"
-
-[[headers]]
-  pattern = "/*"
-  [headers.values]
-    Cross-Origin-Embedder-Policy = "require-corp"
-    Cross-Origin-Opener-Policy = "same-origin"
