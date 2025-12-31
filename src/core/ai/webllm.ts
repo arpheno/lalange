@@ -23,12 +23,22 @@ export const getEngine = async (
         setProgress(`[${tier.toUpperCase()}] ${report.text}`, report.progress);
     };
 
-    // If an engine exists, return it immediately.
-    // We currently enforce a single-model session to avoid VRAM fragmentation.
-    // If the user wants to switch models, they must reload the page (or we implement a full unload).
+    // If an engine exists, check if we need to switch models.
     if (engineInstance) {
         if (currentLoadedModel !== modelId) {
-            console.warn(`[WebLLM] Requested ${modelId} but ${currentLoadedModel} is already loaded. Using loaded model.`);
+            console.log(`[WebLLM] Switching model from ${currentLoadedModel} to ${modelId}...`);
+            setLoading(true, modelId);
+            setReady(false);
+            try {
+                await engineInstance.reload(modelId, { initProgressCallback: onProgress });
+                currentLoadedModel = modelId;
+                setReady(true);
+            } catch (error) {
+                console.error("Failed to switch model:", error);
+                throw error;
+            } finally {
+                setLoading(false);
+            }
         }
         return engineInstance;
     }
@@ -37,8 +47,13 @@ export const getEngine = async (
     setReady(false);
 
     try {
+        // Check for Cache API support (required for WebLLM)
+        if (typeof window !== 'undefined' && !('caches' in window)) {
+            throw new Error("Browser Cache API is missing. This feature requires a Secure Context (HTTPS or localhost).");
+        }
+
         console.log(`[WebLLM] Initializing engine with model: ${modelId}`);
-        engineInstance = await CreateMLCEngine(modelId, { 
+        engineInstance = await CreateMLCEngine(modelId, {
             initProgressCallback: onProgress,
             logLevel: "INFO" // Enable logging to help debug
         });
