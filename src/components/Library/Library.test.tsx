@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { RxDatabase } from 'rxdb';
+import type { MyDatabase } from '../../core/sync/db';
 import { Library } from './Library';
 import * as dbModule from '../../core/sync/db';
 
@@ -76,7 +76,7 @@ describe('Library', () => {
             }
         };
 
-        vi.mocked(dbModule.initDB).mockResolvedValue(mockDB as unknown as RxDatabase);
+        vi.mocked(dbModule.initDB).mockResolvedValue(mockDB as unknown as MyDatabase);
 
         // Mock confirm
         global.confirm = vi.fn(() => true);

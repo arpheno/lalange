@@ -57,7 +57,7 @@ export const generateWebLLMCompletion = async (
     });
     return {
         response: reply.choices[0].message.content || "",
-        usage: reply.usage
+        usage: reply.usage as Record<string, unknown> | undefined
     };
 };
 

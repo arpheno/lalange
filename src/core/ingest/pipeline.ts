@@ -371,8 +371,8 @@ ${chunk.substring(0, 3000)}
                                 // Inside this callback is where the LLM is actually called
                                 const densities = await analyzeDensityRange(chunkWords, async (metrics) => {
                                     if (metrics && metrics.eval_count && metrics.eval_duration) {
-                                        const durationSeconds = metrics.eval_duration / 1e9;
-                                        const tpm = durationSeconds > 0 ? (metrics.eval_count / durationSeconds) * 60 : 0;
+                                        const durationSeconds = (metrics.eval_duration as number) / 1e9;
+                                        const tpm = durationSeconds > 0 ? ((metrics.eval_count as number) / durationSeconds) * 60 : 0;
                                         const freshDoc = await db.chapters.findOne(currentDoc.id).exec();
                                         if (freshDoc) {
                                             await freshDoc.incrementalPatch({ lastTPM: Math.round(tpm) });

@@ -31,21 +31,17 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
     let totalWords = 0;
 
     // Iterate through the spine
-    // @ts-expect-error - epubjs types are incomplete
-    const spineItems = book.spine.items;
+    const spineItems = (book.spine as any).items;
 
     for (let i = 0; i < spineItems.length; i++) {
         const item = spineItems[i];
         try {
             // Load the chapter
             let doc: Document;
-            // @ts-expect-error - epubjs types are incomplete
             if (typeof item.load === 'function') {
-                // @ts-expect-error - epubjs types are incomplete
                 doc = await item.load(book.load.bind(book));
             } else {
                 // Fallback: load directly via book.load
-                // @ts-expect-error - epubjs types are incomplete
                 const loaded = await book.load(item.href);
                 if (typeof loaded === 'string') {
                     const parser = new DOMParser();
@@ -74,9 +70,7 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
             }
 
             // Unload to free memory
-            // @ts-expect-error - epubjs types are incomplete
             if (typeof item.unload === 'function') {
-                // @ts-expect-error - epubjs types are incomplete
                 item.unload();
             }
         } catch (e) {

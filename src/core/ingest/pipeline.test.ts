@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { processChaptersInBackground } from './pipeline';
-import { initDB } from '../sync/db';
-import type { RxDatabase } from 'rxdb';
+import { initDB, type MyDatabase } from '../sync/db';
 import JSZip from 'jszip';
 
 // Mock dependencies
@@ -17,9 +16,21 @@ vi.mock('../ai/service', () => ({
 }));
 
 describe('processChaptersInBackground', () => {
-    let mockDb: Record<string, unknown>;
-    let mockChapterDoc: Record<string, unknown>;
-    let mockRawFileDoc: Record<string, unknown>;
+    let mockDb: {
+        raw_files: { findOne: any };
+        chapters: { findOne: any };
+        books: { findOne: any };
+    };
+    let mockChapterDoc: {
+        status: string;
+        title: string;
+        patch: any;
+        incrementalPatch: any;
+        incrementalModify: any;
+        toJSON: () => any;
+        [key: string]: any;
+    };
+    let mockRawFileDoc: { data: string };
 
     beforeEach(() => {
         // Setup mock DB
@@ -66,7 +77,7 @@ describe('processChaptersInBackground', () => {
             }
         };
 
-        vi.mocked(initDB).mockResolvedValue(mockDb as unknown as RxDatabase);
+        vi.mocked(initDB).mockResolvedValue(mockDb as unknown as MyDatabase);
 
         // Mock JSZip to return a valid structure
         const mockZip = {
