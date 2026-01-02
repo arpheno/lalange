@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { processChaptersInBackground } from './pipeline';
 import { initDB, type MyDatabase } from '../sync/db';
 import JSZip from 'jszip';
@@ -17,18 +17,18 @@ vi.mock('../ai/service', () => ({
 
 describe('processChaptersInBackground', () => {
     let mockDb: {
-        raw_files: { findOne: any };
-        chapters: { findOne: any };
-        books: { findOne: any };
+        raw_files: { findOne: Mock };
+        chapters: { findOne: Mock };
+        books: { findOne: Mock };
     };
     let mockChapterDoc: {
         status: string;
         title: string;
-        patch: any;
-        incrementalPatch: any;
-        incrementalModify: any;
-        toJSON: () => any;
-        [key: string]: any;
+        patch: Mock;
+        incrementalPatch: Mock;
+        incrementalModify: Mock;
+        toJSON: () => Record<string, unknown>;
+        [key: string]: unknown;
     };
     let mockRawFileDoc: { data: string };
 

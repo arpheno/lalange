@@ -31,7 +31,13 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
     let totalWords = 0;
 
     // Iterate through the spine
-    const spineItems = (book.spine as any).items;
+    const spineItems = (book.spine as unknown as {
+        items: {
+            load: (fn: unknown) => Promise<Document>;
+            unload: () => void;
+            href: string;
+        }[]
+    }).items;
 
     for (let i = 0; i < spineItems.length; i++) {
         const item = spineItems[i];
