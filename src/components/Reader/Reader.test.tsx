@@ -117,6 +117,15 @@ describe('Reader Component', () => {
         });
     });
 
+    it('should have the sidebar open by default', async () => {
+        render(<Reader book={mockBook} />);
+        await waitFor(() => {
+            const sidebar = screen.getByTestId('sidebar-container');
+            expect(sidebar).toHaveClass('translate-x-0');
+            expect(sidebar).not.toHaveClass('-translate-x-full');
+        });
+    });
+
     it('should toggle play/pause', async () => {
         render(<Reader book={mockBook} />);
         await waitFor(() => {
@@ -148,7 +157,7 @@ describe('Reader Component', () => {
         });
 
         // Open Sidebar
-        const chaptersBtn = screen.getByTitle('Librarian');
+        const chaptersBtn = screen.getByTitle('Chapters');
         fireEvent.click(chaptersBtn);
 
         // Click Chapter 2 in sidebar

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { MyDatabase } from '../../core/sync/db';
-import { Library } from './Library';
+import { Archive } from './Archive';
 import * as dbModule from '../../core/sync/db';
 
 // Mock the DB module
@@ -15,7 +15,7 @@ vi.mock('../../core/ingest/pipeline', () => ({
     processChaptersInBackground: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe('Library', () => {
+describe('Archive', () => {
     const mockOnOpenBook = vi.fn();
     const mockRemoveBook = vi.fn();
     const mockRemoveChapter = vi.fn();
@@ -57,22 +57,26 @@ describe('Library', () => {
                             return { unsubscribe: vi.fn() };
                         }
                     }
-                })
+                }),
+                bulkInsert: vi.fn()
             },
             images: {
                 find: () => ({
                     exec: async () => [{ remove: mockRemoveImage }]
-                })
+                }),
+                bulkInsert: vi.fn()
             },
             raw_files: {
                 findOne: () => ({
                     exec: async () => ({ remove: mockRemoveRawFile })
-                })
+                }),
+                insert: vi.fn()
             },
             reading_states: {
                 findOne: () => ({
                     exec: async () => ({ remove: mockRemoveReadingState })
-                })
+                }),
+                insert: vi.fn()
             }
         };
 
@@ -83,7 +87,7 @@ describe('Library', () => {
     });
 
     it('renders books and allows deletion', async () => {
-        render(<Library onOpenBook={mockOnOpenBook} />);
+        render(<Archive onOpenBook={mockOnOpenBook} />);
 
         // Check if book is rendered
         expect(await screen.findByText('Test Book')).toBeDefined();

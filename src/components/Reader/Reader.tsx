@@ -23,7 +23,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
 
     // Sidebar & Chapters
     const [chapters, setChapters] = useState<ChapterDocType[]>([]);
-    const [showSidebar, setShowSidebar] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(true);
     const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
     const [now, setNow] = useState(Date.now()); // Force re-render for live time updates
 
@@ -165,7 +165,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                 setCurrentWordIndex(initialIndex);
                 renderWord(initialIndex, chapterDoc.content);
                 setLoading(false);
-                setShowSidebar(false);
+                // setShowSidebar(false); // Keep sidebar open by default
 
                 // Update state immediately if starting fresh
                 if (initialIndex === 0) {
@@ -504,7 +504,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                 <button
                     onClick={() => setShowSidebar(!showSidebar)}
                     className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg"
-                    title="Librarian"
+                    title="Chapters"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {showSidebar ? (
@@ -532,29 +532,33 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                 </button>
             </div>
 
-            {/* Librarian Section (Full Screen Overlay) */}
+            {/* Sidebar (Chapters) */}
             <div
-                className={`fixed inset-0 z-50 bg-basalt transform transition-transform duration-300 ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
+                data-testid="sidebar-container"
+                className={`fixed inset-y-0 left-0 z-50 w-80 bg-basalt border-r border-white/10 transform transition-transform duration-300 ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
+                style={{ willChange: 'transform' }}
             >
-                <div className="w-full max-w-3xl mx-auto h-full border-x border-white/10 pt-20">
-                    <Sidebar
-                        chapters={chapters}
-                        currentChapter={currentChapter}
-                        onLoadChapter={(id, index) => {
-                            loadChapter(id, index || 0);
-                            setShowSidebar(false);
-                        }}
-                        onInspectChapter={setInspectingChapter}
-                        wpm={wpm}
-                        currentWordIndex={currentWordIndex}
-                        now={now}
-                    />
-                </div>
+                <Sidebar
+                    chapters={chapters}
+                    currentChapter={currentChapter}
+                    onLoadChapter={(id, index) => {
+                        loadChapter(id, index || 0);
+                        setShowSidebar(false);
+                    }}
+                    onInspectChapter={setInspectingChapter}
+                    wpm={wpm}
+                    currentWordIndex={currentWordIndex}
+                    now={now}
+                />
             </div>
-            {/* Backdrop for sidebar - Removed as it's now full screen */}
+
+            {/* Backdrop for sidebar - Removed to prevent blocking view */}
 
             {/* Main Reader Area (Full Screen) */}
-            <div className="flex-1 h-full relative flex flex-col min-w-0">
+            <div
+                className={`flex-1 h-full relative flex flex-col min-w-0 transition-all duration-300 ${showSidebar ? 'ml-80' : 'ml-0'}`}
+                style={{ marginLeft: showSidebar ? '20rem' : '0' }}
+            >
                 <div className="w-full h-full flex flex-col relative group"
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}

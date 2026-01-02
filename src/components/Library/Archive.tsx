@@ -2,20 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
 import { initialIngest, processChaptersInBackground } from '../../core/ingest/pipeline';
 import { useAIStore } from '../../core/store/ai';
-import { useSettingsStore } from '../../core/store/settings';
 import { BookCard } from './BookCard';
-import { Librarian } from './Librarian';
 
-interface LibraryProps {
+interface ArchiveProps {
     onOpenBook: (book: BookDocType) => void;
 }
 
-export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
+export const Archive: React.FC<ArchiveProps> = ({ onOpenBook }) => {
     const [books, setBooks] = useState<BookDocType[]>([]);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
     const aiState = useAIStore();
-    const { sidebarOpen } = useSettingsStore();
 
     useEffect(() => {
         let sub: { unsubscribe: () => void };
@@ -200,11 +197,6 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
                     )}
                 </div>
             </div>
-            {sidebarOpen && (
-                <div className="w-96 border-l border-white/10 bg-stone-950">
-                    <Librarian />
-                </div>
-            )}
         </div>
     );
 };

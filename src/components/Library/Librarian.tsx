@@ -127,7 +127,7 @@ export const Librarian: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-stone-50 dark:bg-stone-900 border-l border-stone-200 dark:border-stone-800">
+        <div className="flex flex-col h-full bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden">
             <div className="p-4 border-b border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-950">
                 <h2 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">The Librarian</h2>
                 <div className="flex items-center gap-2 text-xs text-stone-500">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Library } from './components/Library/Library'
+import { Archive } from './components/Library/Archive'
+import { Librarian } from './components/Library/Librarian'
 import { Reader } from './components/Reader/Reader'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import { Manifesto } from './components/Manifesto'
@@ -8,11 +9,30 @@ import { useSettingsStore } from './core/store/settings'
 import { useAIStore } from './core/store/ai'
 import { clsx } from 'clsx'
 
-type ViewState = 'library' | 'reader' | 'settings' | 'manifesto';
+type ViewState = 'archive' | 'reader' | 'library' | 'settings' | 'manifesto';
+
+interface NavButtonProps {
+  target: ViewState;
+  label: string;
+  currentView: ViewState;
+  onNavigate: (view: ViewState) => void;
+}
+
+const NavButton = ({ target, label, currentView, onNavigate }: NavButtonProps) => (
+  <button
+    onClick={() => onNavigate(target)}
+    className={clsx(
+      "text-xs transition-colors font-mono px-2",
+      currentView === target ? "text-dune-gold font-bold" : "text-gray-600 hover:text-dune-gold"
+    )}
+  >
+    [ {label} ]
+  </button>
+);
 
 function App() {
   const [currentBook, setCurrentBook] = useState<BookDocType | null>(null)
-  const [view, setView] = useState<ViewState>('library')
+  const [view, setView] = useState<ViewState>('archive')
   const { theme } = useSettingsStore()
   const aiState = useAIStore()
 
@@ -35,7 +55,7 @@ function App() {
     if (currentBook) {
       setView('reader');
     } else {
-      setView('library');
+      setView('archive');
     }
   };
 
@@ -47,35 +67,20 @@ function App() {
     )}>
       <div className="w-full flex justify-between items-center p-4 border-b border-white/10 bg-black/20 backdrop-blur-sm z-10">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">ARPHEN</h1>
+          <h1 className="text-xl font-mono font-bold tracking-widest text-magma-vent animate-pulse">XYZ</h1>
           {aiState.activity && (
             <div className="hidden md:flex items-center gap-2 text-[10px] text-dune-gold font-mono border border-dune-gold/20 px-2 py-1 rounded bg-dune-gold/5 animate-in fade-in slide-in-from-left-2">
               <span className="animate-pulse">●</span>
               <span className="uppercase tracking-wider">{aiState.activity}</span>
             </div>
           )}
-          <button
-            onClick={() => setView(view === 'settings' ? (currentBook ? 'reader' : 'library') : 'settings')}
-            className={clsx(
-              "text-xs transition-colors font-mono",
-              view === 'settings' ? "text-dune-gold font-bold" : "text-gray-600 hover:text-dune-gold"
-            )}
-          >
-            [ {view === 'settings' ? 'CLOSE_SETTINGS' : 'SETTINGS'} ]
-          </button>
         </div>
-        <div className="flex items-center gap-4">
-          {view !== 'library' && view !== 'manifesto' && (
-            <button
-              onClick={() => {
-                setCurrentBook(null);
-                setView('library');
-              }}
-              className="font-mono text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              [ BACK_TO_LIBRARY ]
-            </button>
-          )}
+
+        <div className="flex items-center gap-2">
+          {currentBook && <NavButton target="reader" label="READER" currentView={view} onNavigate={setView} />}
+          <NavButton target="archive" label="ARCHIVE" currentView={view} onNavigate={setView} />
+          <NavButton target="library" label="LIBRARY" currentView={view} onNavigate={setView} />
+          <NavButton target="settings" label="SETTINGS" currentView={view} onNavigate={setView} />
         </div>
       </div>
 
@@ -86,14 +91,18 @@ function App() {
         {view === 'settings' ? (
           <SettingsPanel onClose={handleCloseSettings} />
         ) : view === 'manifesto' ? (
-          <Manifesto onBack={() => setView('library')} />
+          <Manifesto onBack={() => setView('archive')} />
         ) : view === 'reader' && currentBook ? (
           <Reader
             book={currentBook}
             onOpenSettings={() => setView('settings')}
           />
+        ) : view === 'library' ? (
+          <div className="w-full h-full max-w-4xl p-4 flex flex-col">
+            <Librarian />
+          </div>
         ) : (
-          <Library onOpenBook={handleOpenBook} />
+          <Archive onOpenBook={handleOpenBook} />
         )}
       </div>
 
@@ -103,7 +112,7 @@ function App() {
           onClick={() => setView('manifesto')}
           className="text-[10px] font-mono text-white/30 hover:text-lacan-red transition-colors tracking-widest uppercase"
         >
-          Made by Arphen
+          Made by <span className="text-magma-vent font-bold">Arphen</span>
         </button>
       </div>
     </div>
