@@ -499,15 +499,19 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     return (
         <div className="relative w-full h-screen bg-basalt text-white overflow-hidden flex">
             {/* Floating Header / Controls */}
-            <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-start pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 z-[60] p-4 flex justify-between items-start pointer-events-none">
                 {/* Menu Button */}
                 <button
-                    onClick={() => setShowSidebar(true)}
-                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg lg:hidden"
-                    title="Chapters"
+                    onClick={() => setShowSidebar(!showSidebar)}
+                    className="pointer-events-auto p-3 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-dune-gold hover:bg-white/10 transition-colors shadow-lg"
+                    title="Librarian"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        {showSidebar ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        )}
                     </svg>
                 </button>
 
@@ -528,27 +532,26 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                 </button>
             </div>
 
-            {/* Sidebar Overlay (Drawer) */}
+            {/* Librarian Section (Full Screen Overlay) */}
             <div
-                className={`fixed inset-y-0 left-0 z-50 w-80 bg-basalt border-r border-white/10 transform transition-transform duration-300 lg:relative lg:translate-x-0 lg:z-0 lg:shadow-none ${showSidebar ? 'translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.5)]' : '-translate-x-full'}`}
+                className={`fixed inset-0 z-50 bg-basalt transform transition-transform duration-300 ${showSidebar ? 'translate-x-0' : '-translate-x-full'}`}
             >
-                <Sidebar
-                    chapters={chapters}
-                    currentChapter={currentChapter}
-                    onLoadChapter={(id, index) => {
-                        loadChapter(id, index || 0);
-                        if (window.innerWidth < 1024) {
+                <div className="w-full max-w-3xl mx-auto h-full border-x border-white/10 pt-20">
+                    <Sidebar
+                        chapters={chapters}
+                        currentChapter={currentChapter}
+                        onLoadChapter={(id, index) => {
+                            loadChapter(id, index || 0);
                             setShowSidebar(false);
-                        }
-                    }}
-                    onInspectChapter={setInspectingChapter}
-                    wpm={wpm}
-                    currentWordIndex={currentWordIndex}
-                    now={now}
-                />
+                        }}
+                        onInspectChapter={setInspectingChapter}
+                        wpm={wpm}
+                        currentWordIndex={currentWordIndex}
+                        now={now}
+                    />
+                </div>
             </div>
-            {/* Backdrop for sidebar */}
-            {showSidebar && <div className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm lg:hidden" onClick={() => setShowSidebar(false)} />}
+            {/* Backdrop for sidebar - Removed as it's now full screen */}
 
             {/* Main Reader Area (Full Screen) */}
             <div className="flex-1 h-full relative flex flex-col min-w-0">

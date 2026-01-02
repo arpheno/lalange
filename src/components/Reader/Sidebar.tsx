@@ -65,10 +65,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
 
     return (
-        <div className={clsx("flex flex-col h-full bg-basalt border-r border-white/10 font-mono text-xs", className)}>
+        <div className={clsx("flex flex-col h-full bg-basalt font-mono text-xs", className)}>
             {/* Header */}
             <div className="p-4 border-b border-white/10">
-                <h3 className="text-dune-gold font-bold tracking-widest mb-1">MANIFEST</h3>
+                <h3 className="text-dune-gold font-bold tracking-widest mb-1">LIBRARIAN</h3>
                 <div className="flex justify-between text-gray-500">
                     <span>{chapters.length} CHUNKS</span>
                     <span>{timeBank} BANKED</span>
