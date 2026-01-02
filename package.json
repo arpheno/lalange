@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest --exclude '**/*.integration.test.ts'",
     "test:integration": "vitest run integration",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.80",
@@ -54,6 +55,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.16",
+    "wrangler": "^4.54.0"
   }
 }
