@@ -146,7 +146,7 @@ describe('Reader Component - Conflict Handling', () => {
 
         // Click Next Chapter while playing
         // Open Sidebar
-        const chaptersBtn = screen.getByTitle('Chapters');
+        const chaptersBtn = screen.getByTitle('Librarian');
         fireEvent.click(chaptersBtn);
 
         // Click Chapter 2 in sidebar

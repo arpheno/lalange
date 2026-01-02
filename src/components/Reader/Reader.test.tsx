@@ -148,7 +148,7 @@ describe('Reader Component', () => {
         });
 
         // Open Sidebar
-        const chaptersBtn = screen.getByTitle('Chapters');
+        const chaptersBtn = screen.getByTitle('Librarian');
         fireEvent.click(chaptersBtn);
 
         // Click Chapter 2 in sidebar
