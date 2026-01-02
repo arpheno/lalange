@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
 import { initialIngest, processChaptersInBackground } from '../../core/ingest/pipeline';
 import { useAIStore } from '../../core/store/ai';
+import { useSettingsStore } from '../../core/store/settings';
 import { BookCard } from './BookCard';
+import { Librarian } from './Librarian';
 
 interface LibraryProps {
     onOpenBook: (book: BookDocType) => void;
@@ -13,6 +15,7 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
     const aiState = useAIStore();
+    const { sidebarOpen } = useSettingsStore();
 
     useEffect(() => {
         let sub: any;
@@ -104,74 +107,104 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
         if (readingState) await readingState.remove();
     };
 
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const file = e.dataTransfer.files[0];
+            if (file.type === 'application/epub+zip' || file.name.endsWith('.epub')) {
+                await ingestBook(file);
+            } else {
+                alert('Please drop an EPUB file.');
+            }
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-basalt text-white p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-white/10 pb-8">
-                    <div>
-                        <h2 className="text-4xl font-mono font-bold text-dune-gold tracking-widest mb-2">ARCHIVE</h2>
-                        <p className="text-gray-500 font-mono text-sm uppercase tracking-wider">
-                            {books.length} TEXTS // {books.reduce((acc, b) => acc + b.totalWords, 0).toLocaleString()} WORDS
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-6 w-full md:w-auto">
-                        {(status || aiState.isLoading) && (
-                            <div className="flex items-center gap-2 text-magma-vent font-mono text-xs animate-pulse">
-                                <span className="w-2 h-2 bg-magma-vent rounded-full"></span>
-                                {aiState.isLoading ? (aiState.progress || 'Initializing AI...') : status}
-                            </div>
-                        )}
-                        <button
-                            onClick={handleLoadDemo}
-                            disabled={loading}
-                            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-sm font-mono text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-                        >
-                            [ LOAD DEMO ]
-                        </button>
-                        <label className="group relative cursor-pointer flex items-center justify-center px-6 py-3 font-mono font-bold text-sm tracking-widest transition-all bg-dune-gold text-black hover:bg-white w-full md:w-auto">
-                            <span className="relative z-10 flex items-center gap-2">
-                                {loading ? 'INGESTING...' : 'UPLOAD EPUB'}
-                                {!loading && (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
-                                )}
-                            </span>
-                            <input
-                                type="file"
-                                accept=".epub"
-                                className="hidden"
-                                onChange={handleFileUpload}
-                                disabled={loading}
-                            />
-                        </label>
-                    </div>
-                </div>
-
-                {books.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-lg bg-white/5">
-                        <div className="w-16 h-16 mb-6 text-gray-600">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
+        <div
+            className="flex h-screen overflow-hidden bg-basalt text-white"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
+                <div className="max-w-7xl mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4 border-b border-white/10 pb-8">
+                        <div>
+                            <h2 className="text-4xl font-mono font-bold text-dune-gold tracking-widest mb-2">ARCHIVE</h2>
+                            <p className="text-gray-500 font-mono text-sm uppercase tracking-wider">
+                                {books.length} TEXTS // {books.reduce((acc, b) => acc + b.totalWords, 0).toLocaleString()} WORDS
+                            </p>
                         </div>
-                        <p className="font-mono text-gray-500 mb-2">ARCHIVE EMPTY</p>
-                        <p className="text-xs text-gray-600 font-mono">UPLOAD EPUB TO BEGIN INGESTION</p>
+
+                        <div className="flex items-center gap-6 w-full md:w-auto">
+                            {(status || aiState.isLoading) && (
+                                <div className="flex items-center gap-2 text-magma-vent font-mono text-xs animate-pulse">
+                                    <span className="w-2 h-2 bg-magma-vent rounded-full"></span>
+                                    {aiState.isLoading ? (aiState.progress || 'Initializing AI...') : status}
+                                </div>
+                            )}
+                            <button
+                                onClick={handleLoadDemo}
+                                disabled={loading}
+                                className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-sm font-mono text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                            >
+                                [ LOAD DEMO ]
+                            </button>
+                            <label className="group relative cursor-pointer flex items-center justify-center px-6 py-3 font-mono font-bold text-sm tracking-widest transition-all bg-dune-gold text-black hover:bg-white w-full md:w-auto">
+                                <span className="relative z-10 flex items-center gap-2">
+                                    {loading ? 'INGESTING...' : 'UPLOAD EPUB'}
+                                    {!loading && (
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                    )}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept=".epub"
+                                    className="hidden"
+                                    onChange={handleFileUpload}
+                                    disabled={loading}
+                                />
+                            </label>
+                        </div>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {books.map(book => (
-                            <BookCard
-                                key={book.id}
-                                book={book}
-                                onOpen={() => onOpenBook(book)}
-                                onDelete={(e) => handleDelete(e, book.id)}
-                            />
-                        ))}
-                    </div>
-                )}
+
+                    {books.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-lg bg-white/5">
+                            <div className="w-16 h-16 mb-6 text-gray-600">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                            </div>
+                            <p className="font-mono text-gray-500 mb-2">ARCHIVE EMPTY</p>
+                            <p className="text-xs text-gray-600 font-mono">UPLOAD EPUB TO BEGIN INGESTION</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {books.map(book => (
+                                <BookCard
+                                    key={book.id}
+                                    book={book}
+                                    onOpen={() => onOpenBook(book)}
+                                    onDelete={(e) => handleDelete(e, book.id)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+            {sidebarOpen && (
+                <div className="w-96 border-l border-white/10 bg-stone-950">
+                    <Librarian />
+                </div>
+            )}
         </div>
     );
 };

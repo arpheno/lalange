@@ -329,16 +329,50 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
                     {/* Librarian Tab */}
                     {activeTab === 'librarian' && (
-                        <AgentConfig
-                            title="The Librarian"
-                            description="Configure the recommendation and analysis engine."
-                            model={settings.librarianModelTier}
-                            setModel={settings.setLibrarianModelTier}
-                            basePrompt={settings.librarianBasePrompt}
-                            setBasePrompt={settings.setLibrarianBasePrompt}
-                            fragments={settings.librarianFragments}
-                            toggleFragment={settings.toggleLibrarianFragment}
-                        />
+                        <div className="space-y-8">
+                            <AgentConfig
+                                title="The Librarian"
+                                description="Configure the recommendation and analysis engine."
+                                model={settings.librarianModelTier}
+                                setModel={settings.setLibrarianModelTier}
+                                basePrompt={settings.librarianBasePrompt}
+                                setBasePrompt={settings.setLibrarianBasePrompt}
+                                fragments={settings.librarianFragments}
+                                toggleFragment={settings.toggleLibrarianFragment}
+                            />
+
+                            <div className="bg-white/5 rounded-lg p-8 border border-white/10 space-y-8">
+                                <div>
+                                    <label className="block text-xs text-dune-gold mb-4 uppercase tracking-widest font-bold">Persona</label>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {(['standard', 'lacanian', 'custom'] as const).map(persona => (
+                                            <button
+                                                key={persona}
+                                                onClick={() => settings.setLibrarianPersona(persona)}
+                                                className={clsx(
+                                                    "p-4 rounded border text-left transition-all",
+                                                    settings.librarianPersona === persona
+                                                        ? "bg-dune-gold text-black border-dune-gold"
+                                                        : "bg-black/20 border-white/10 text-gray-400 hover:border-white/30 hover:text-white"
+                                                )}
+                                            >
+                                                <div className="font-bold uppercase text-sm">{persona}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs text-dune-gold mb-4 uppercase tracking-widest font-bold">Monetization</label>
+                                    <Toggle
+                                        label="Support Development"
+                                        description="(You) generate affiliate links for arphen so he can pay for his domain name"
+                                        checked={settings.affiliateLinksEnabled}
+                                        onChange={settings.setAffiliateLinksEnabled}
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* Summarizer Tab */}

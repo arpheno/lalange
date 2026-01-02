@@ -75,6 +75,10 @@ interface SettingsState {
     setLibrarianBasePrompt: (prompt: string) => void;
     librarianFragments: PromptFragment[];
     toggleLibrarianFragment: (id: string) => void;
+    affiliateLinksEnabled: boolean;
+    setAffiliateLinksEnabled: (enabled: boolean) => void;
+    librarianPersona: 'standard' | 'lacanian' | 'custom';
+    setLibrarianPersona: (persona: 'standard' | 'lacanian' | 'custom') => void;
 
     // Legacy Librarian
     librarianModel: 'mistral' | 'llama' | 'other';
@@ -161,12 +165,16 @@ export const useSettingsStore = create<SettingsState>()(
             // Librarian Defaults
             librarianModelTier: 'tiny',
             setLibrarianModelTier: (librarianModelTier) => set({ librarianModelTier }),
-            librarianBasePrompt: 'You are a helpful librarian. Analyze the text and provide recommendations.',
+            librarianBasePrompt: 'You are the Scansion Librarian, a knowledgeable, slightly eccentric guide to the world\'s classics. Your goal is to recommend public domain books from Project Gutenberg.',
             setLibrarianBasePrompt: (librarianBasePrompt) => set({ librarianBasePrompt }),
             librarianFragments: [...defaultFragments],
             toggleLibrarianFragment: (id) => set((state) => ({
                 librarianFragments: state.librarianFragments.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f)
             })),
+            affiliateLinksEnabled: false,
+            setAffiliateLinksEnabled: (affiliateLinksEnabled) => set({ affiliateLinksEnabled }),
+            librarianPersona: 'standard',
+            setLibrarianPersona: (librarianPersona) => set({ librarianPersona }),
 
             // Legacy Librarian
             librarianModel: 'mistral',
