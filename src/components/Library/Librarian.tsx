@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../../core/store/settings';
 import { generateUnifiedCompletion } from '../../core/ai/service';
 import { searchGutenberg, type GutenbergBook } from '../../core/api/gutendex';
-import { useAIStore } from '../../core/store/ai';
 
 interface Recommendation {
     title: string;
@@ -141,8 +140,8 @@ export const Librarian: React.FC = () => {
                 {messages.map((msg, idx) => (
                     <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[85%] p-3 rounded-lg ${msg.role === 'user'
-                                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900'
-                                : 'bg-white border border-stone-200 dark:bg-stone-800 dark:border-stone-700 text-stone-800 dark:text-stone-200'
+                            ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900'
+                            : 'bg-white border border-stone-200 dark:bg-stone-800 dark:border-stone-700 text-stone-800 dark:text-stone-200'
                             }`}>
                             <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
                         </div>
