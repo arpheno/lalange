@@ -47,8 +47,27 @@ export const Librarian: React.FC = () => {
             prompt += "\n\nAdopt the persona of a Lacanian psychoanalyst. Analyze the user's desire through the lens of the symbolic, imaginary, and real. Speak in riddles and psychoanalytic jargon, but ultimately guide them to a book.";
         }
 
-        prompt += "\n\nYou must respond in a specific JSON format. Do not include any text outside the JSON object.";
-        prompt += "\nJSON Format: { \"thought\": \"your internal reasoning\", \"message\": \"your response to the user\", \"recommendations\": [ { \"title\": \"Book Title\", \"author\": \"Author Name\", \"reason\": \"Why you recommended it\", \"modern_counterpart\": { \"title\": \"Modern Book Title\", \"author\": \"Modern Author\", \"reason\": \"Connection to the classic\" } } ] }";
+        prompt += `
+You must respond in a specific JSON format. Do not include any text outside the JSON object.
+Ensure the JSON is valid.
+
+JSON Format:
+{
+  "thought": "your internal reasoning",
+  "message": "your response to the user",
+  "recommendations": [
+    {
+      "title": "Book Title",
+      "author": "Author Name",
+      "reason": "Why you recommended it",
+      "modern_counterpart": { // Only if applicable or requested
+        "title": "Modern Book Title",
+        "author": "Modern Author",
+        "reason": "Connection to the classic"
+      }
+    }
+  ]
+}`;
 
         if (affiliateLinksEnabled) {
             prompt += "\n\nFor each recommendation, you MUST suggest a 'modern_counterpart' that explores similar themes but is a contemporary commercial book.";
@@ -81,13 +100,19 @@ export const Librarian: React.FC = () => {
                 const firstBrace = response.indexOf('{');
                 const lastBrace = response.lastIndexOf('}');
                 if (firstBrace !== -1 && lastBrace !== -1) {
-                    const jsonStr = response.substring(firstBrace, lastBrace + 1);
+                    let jsonStr = response.substring(firstBrace, lastBrace + 1);
+
+                    // Clean up JSON
+                    jsonStr = jsonStr.replace(/[\u201C\u201D]/g, '"'); // Smart quotes
+                    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1'); // Trailing commas
+
                     parsedResponse = JSON.parse(jsonStr);
                 } else {
                     throw new Error("No JSON found");
                 }
             } catch (e) {
                 console.error("Failed to parse AI response", e);
+                console.log("Raw AI response:", response);
                 // Fallback for non-JSON response
                 setMessages(prev => [...prev, { role: 'assistant', content: response }]);
                 setIsThinking(false);
