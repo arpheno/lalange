@@ -2,7 +2,7 @@
 
 .PHONY: setup install-ollama start-ollama pull-model dev test-ollama ollama-test
 
-# Detect OS!
+# Detect OS!!
 OS := $(shell uname -s)
 
 setup: install-ollama pull-model
