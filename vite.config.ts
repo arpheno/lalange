@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import basicSsl from '@vitejs/plugin-basic-ssl'
+import { execSync } from 'child_process'
+
+const commitHash = execSync('git rev-parse --short HEAD').toString().trim();
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __COMMIT_HASH__: JSON.stringify(commitHash),
+  },
   plugins: [
     basicSsl(),
     react(),

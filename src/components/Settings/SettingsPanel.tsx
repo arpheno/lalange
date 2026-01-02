@@ -93,6 +93,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     >
                         [ CLOSE SETTINGS ]
                     </button>
+                    <div className="mt-4 text-center">
+                        <p className="text-[10px] text-gray-600 font-mono">
+                            v0.1.0-{__COMMIT_HASH__}
+                        </p>
+                    </div>
                 </div>
             </div>
 
