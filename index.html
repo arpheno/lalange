@@ -13,6 +13,19 @@
 
 <body>
   <div id="root"></div>
+  <script>
+    // Dev-only: Clear service workers and caches on first load
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      const key = '__sw_v2_' + location.port;
+      if (!sessionStorage.getItem(key) && 'serviceWorker' in navigator) {
+        sessionStorage.setItem(key, '1');
+        Promise.all([
+          navigator.serviceWorker.getRegistrations().then(r => Promise.all(r.map(x => x.unregister()))),
+          caches?.keys().then(k => Promise.all(k.map(x => caches.delete(x))))
+        ]).then(() => location.reload()).catch(() => location.reload());
+      }
+    }
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

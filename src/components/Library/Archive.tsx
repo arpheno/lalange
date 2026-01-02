@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { initDB, type BookDocType } from '../../core/sync/db';
-import { initialIngest, processChaptersInBackground } from '../../core/ingest/pipeline';
+import { initialIngest, processChaptersInBackground, stopProcessing, isProcessing, estimateBookDensity } from '../../core/ingest/pipeline';
 import { useAIStore } from '../../core/store/ai';
 import { BookCard } from './BookCard';
 
@@ -80,6 +80,37 @@ export const Archive: React.FC<ArchiveProps> = ({ onOpenBook }) => {
             alert((e as Error).message);
             setLoading(false);
             setStatus('');
+        }
+    };
+
+    const handleBookClick = async (book: BookDocType) => {
+        if (isProcessing(book.id)) {
+            if (confirm('Ingestion is in progress. Stop?')) {
+                stopProcessing(book.id);
+            }
+            return;
+        }
+
+        const db = await initDB();
+        const chapters = await db.chapters.find({ selector: { bookId: book.id } }).exec();
+        const hasError = chapters.some(c => c.status === 'error');
+        const isPending = chapters.some(c => c.status === 'pending' || c.status === 'processing');
+
+        if (hasError || isPending) {
+            if (confirm('Book ingestion is incomplete/failed. Resume?')) {
+                processChaptersInBackground(book.id).catch(console.error);
+                return;
+            }
+            if (!confirm('Open reader anyway?')) return;
+        }
+
+        onOpenBook(book);
+    };
+
+    const handleEstimateDensity = async (e: React.MouseEvent, bookId: string) => {
+        e.stopPropagation();
+        if (confirm('Start density estimation for this book? This may take a while.')) {
+            estimateBookDensity(bookId).catch(console.error);
         }
     };
 
@@ -189,8 +220,9 @@ export const Archive: React.FC<ArchiveProps> = ({ onOpenBook }) => {
                                 <BookCard
                                     key={book.id}
                                     book={book}
-                                    onOpen={() => onOpenBook(book)}
+                                    onOpen={() => handleBookClick(book)}
                                     onDelete={(e) => handleDelete(e, book.id)}
+                                    onEstimateDensity={(e) => handleEstimateDensity(e, book.id)}
                                 />
                             ))}
                         </div>
