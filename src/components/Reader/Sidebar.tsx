@@ -11,6 +11,7 @@ interface SidebarProps {
     wpm: number;
     className?: string;
     currentWordIndex?: number;
+    now: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,7 +21,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onInspectChapter,
     wpm,
     className,
-    currentWordIndex
+    currentWordIndex,
+    now
 }) => {
     const [expandedSummary, setExpandedSummary] = useState<string | null>(null);
 
@@ -48,7 +50,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const lastChunkTime = chapter.lastChunkCompletedAt || 0;
 
             if (speed > 0 && lastChunkTime > 0) {
-                const now = Date.now();
                 const timeSinceLastChunk = (now - lastChunkTime) / 60000;
                 const projectedNewWords = Math.floor(speed * timeSinceLastChunk);
                 const estimatedTotalWords = reportedWords + projectedNewWords;

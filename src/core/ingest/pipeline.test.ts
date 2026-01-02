@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { processChaptersInBackground } from './pipeline';
 import { initDB } from '../sync/db';
+import type { RxDatabase } from 'rxdb';
 import JSZip from 'jszip';
 
 // Mock dependencies
@@ -16,9 +17,9 @@ vi.mock('../ai/service', () => ({
 }));
 
 describe('processChaptersInBackground', () => {
-    let mockDb: any;
-    let mockChapterDoc: any;
-    let mockRawFileDoc: any;
+    let mockDb: Record<string, unknown>;
+    let mockChapterDoc: Record<string, unknown>;
+    let mockRawFileDoc: Record<string, unknown>;
 
     beforeEach(() => {
         // Setup mock DB
@@ -65,7 +66,7 @@ describe('processChaptersInBackground', () => {
             }
         };
 
-        (initDB as any).mockResolvedValue(mockDb);
+        vi.mocked(initDB).mockResolvedValue(mockDb as unknown as RxDatabase);
 
         // Mock JSZip to return a valid structure
         const mockZip = {
@@ -81,7 +82,7 @@ describe('processChaptersInBackground', () => {
         };
 
         // We need to mock JSZip.loadAsync
-        vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(mockZip as any);
+        vi.spyOn(JSZip, 'loadAsync').mockResolvedValue(mockZip as unknown as JSZip);
     });
 
     it('should handle document updates without conflict', async () => {

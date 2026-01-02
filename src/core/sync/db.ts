@@ -87,6 +87,7 @@ export const initDB = async (): Promise<MyDatabase> => {
     }
 
     dbPromise = (async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let storage: RxStorage<any, any> = getRxStorageDexie();
         if (import.meta.env.DEV) {
             const { RxDBDevModePlugin } = await import('rxdb/plugins/dev-mode');

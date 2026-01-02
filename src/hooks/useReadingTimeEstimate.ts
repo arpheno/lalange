@@ -27,20 +27,23 @@ export const useReadingTimeEstimate = (
 ): ReadingTimeEstimate | null => {
     const [estimate, setEstimate] = useState<ReadingTimeEstimate | null>(null);
 
+    const status = chapter?.status;
+    const reportedWords = chapter?.content?.length ?? 0;
+    const processingSpeed = chapter?.processingSpeed ?? 0;
+    const lastChunkTime = chapter?.lastChunkCompletedAt ?? 0;
+
     useEffect(() => {
-        if (!chapter) {
+        if (!status) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setEstimate(null);
             return;
         }
 
         const calculateEstimate = () => {
-            const isProcessing = chapter.status === 'processing';
-            const reportedWords = chapter.content.length;
-            const processingSpeed = chapter.processingSpeed || 0;
-            const lastChunkTime = chapter.lastChunkCompletedAt || 0;
+            const isProcessing = status === 'processing';
 
             // For finished chapters, just calculate reading time
-            if (chapter.status === 'ready') {
+            if (status === 'ready') {
                 const totalMinutes = reportedWords / userReadingWpm;
                 setEstimate({
                     totalMinutesAtCurrentWpm: totalMinutes,
@@ -83,11 +86,11 @@ export const useReadingTimeEstimate = (
         calculateEstimate();
 
         // Update estimate every second while processing
-        if (chapter.status === 'processing') {
+        if (status === 'processing') {
             const interval = setInterval(calculateEstimate, 1000);
             return () => clearInterval(interval);
         }
-    }, [chapter, userReadingWpm]);
+    }, [status, reportedWords, processingSpeed, lastChunkTime, userReadingWpm]);
 
     return estimate;
 };

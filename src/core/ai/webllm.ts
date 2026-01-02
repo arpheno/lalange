@@ -49,7 +49,7 @@ export const getEngine = async (
 export const generateWebLLMCompletion = async (
     prompt: string,
     tier: ModelTier
-): Promise<{ response: string, usage?: any }> => {
+): Promise<{ response: string, usage?: Record<string, unknown> }> => {
     const engine = await getEngine(tier);
     const reply = await engine.chat.completions.create({
         messages: [{ role: "user", content: prompt }],

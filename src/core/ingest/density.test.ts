@@ -14,7 +14,7 @@ describe('analyzeDensityRange', () => {
     });
 
     it('should return default densities if LLM fails', async () => {
-        (generateUnifiedCompletion as any).mockRejectedValue(new Error('LLM Error'));
+        vi.mocked(generateUnifiedCompletion).mockRejectedValue(new Error('LLM Error'));
         const words = ['hello', 'world'];
         const densities = await analyzeDensityRange(words);
         // Default score is 5 -> factor 1.0
@@ -30,7 +30,7 @@ describe('analyzeDensityRange', () => {
                 "simple text": 1
             })
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['hello', 'world', '.', 'simple', 'text', '.'];
         const densities = await analyzeDensityRange(words);
@@ -50,7 +50,7 @@ describe('analyzeDensityRange', () => {
                 "hello world": 10
             })
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['hello', 'world', '.', 'unknown', 'part', '.'];
         const densities = await analyzeDensityRange(words);
@@ -70,7 +70,7 @@ describe('analyzeDensityRange', () => {
                 "Hello world": 10
             })
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['Hello,', 'world!'];
         const densities = await analyzeDensityRange(words);
@@ -88,7 +88,7 @@ describe('analyzeDensityRange', () => {
                 "Hello, world!": 10
             })
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['Hello,', 'world!'];
         const densities = await analyzeDensityRange(words);
@@ -112,7 +112,7 @@ Here is the analysis you requested:
 I hope this helps!
         `
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['Simple', 'sentence', '.'];
         const densities = await analyzeDensityRange(words);
@@ -128,7 +128,7 @@ I hope this helps!
             “Smart quotes”: 10
         }`
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['Smart', 'quotes', '.'];
         const densities = await analyzeDensityRange(words);
@@ -145,7 +145,7 @@ I hope this helps!
             "Jumps over the lazy dog": 2`
         };
 
-        (generateUnifiedCompletion as any).mockResolvedValue(truncatedResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(truncatedResponse);
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -169,7 +169,7 @@ I hope this helps!
             "Jumps over the lazy dog": 2,`
         };
 
-        (generateUnifiedCompletion as any).mockResolvedValue(truncatedResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(truncatedResponse);
 
         const words = ["The", "quick", "brown", "fox.", "Jumps", "over", "the", "lazy", "dog."];
         const densities = await analyzeDensityRange(words);
@@ -188,7 +188,7 @@ I hope this helps!
 }`
         };
 
-        (generateUnifiedCompletion as any).mockResolvedValue(invalidJsonish);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(invalidJsonish);
 
         const words = ['""', 'he', 'thought.', 'It', 'wasn’t', 'a', 'dream.'];
         const densities = await analyzeDensityRange(words);
@@ -206,7 +206,7 @@ I hope this helps!
                 "Chapter 5": 0
             })
         };
-        (generateUnifiedCompletion as any).mockResolvedValue(mockResponse);
+        vi.mocked(generateUnifiedCompletion).mockResolvedValue(mockResponse);
 
         const words = ['Page', '12', '.', 'Chapter', '5', '.'];
         const densities = await analyzeDensityRange(words);

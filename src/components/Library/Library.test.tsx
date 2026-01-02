@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { RxDatabase } from 'rxdb';
 import { Library } from './Library';
 import * as dbModule from '../../core/sync/db';
 
@@ -30,7 +31,7 @@ describe('Library', () => {
             books: {
                 find: () => ({
                     $: {
-                        subscribe: (cb: any) => {
+                        subscribe: (cb: (docs: unknown[]) => void) => {
                             cb([
                                 {
                                     id: 'book1',
@@ -51,7 +52,7 @@ describe('Library', () => {
                 find: () => ({
                     exec: async () => [{ remove: mockRemoveChapter }],
                     $: {
-                        subscribe: (cb: any) => {
+                        subscribe: (cb: (docs: unknown[]) => void) => {
                             cb([]); // Return empty chapters for now
                             return { unsubscribe: vi.fn() };
                         }
@@ -75,7 +76,7 @@ describe('Library', () => {
             }
         };
 
-        (dbModule.initDB as any).mockResolvedValue(mockDB);
+        vi.mocked(dbModule.initDB).mockResolvedValue(mockDB as unknown as RxDatabase);
 
         // Mock confirm
         global.confirm = vi.fn(() => true);

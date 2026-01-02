@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { RxDatabase } from 'rxdb';
 import { Reader } from './Reader';
 import * as dbModule from '../../core/sync/db';
 
@@ -83,7 +84,7 @@ describe('Reader Component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (dbModule.initDB as any).mockResolvedValue(mockDb);
+        vi.mocked(dbModule.initDB).mockResolvedValue(mockDb as unknown as RxDatabase);
     });
 
     it('should render loading state initially', () => {

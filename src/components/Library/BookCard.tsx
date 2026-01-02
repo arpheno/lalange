@@ -14,7 +14,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onOpen, onDelete }) =>
     const [processingStatus, setProcessingStatus] = useState<string>('');
 
     useEffect(() => {
-        let sub: any;
+        let sub: { unsubscribe: () => void };
         const setup = async () => {
             const db = await initDB();
             sub = db.chapters.find({

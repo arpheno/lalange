@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { RxDatabase } from 'rxdb';
 import { Reader } from './Reader';
 import * as dbModule from '../../core/sync/db';
 
@@ -39,7 +40,7 @@ describe('Reader Component - Conflict Handling', () => {
     };
 
     // Stateful DB Mock
-    let dbState = {
+    const dbState = {
         readingState: {
             bookId: 'book-conflict',
             currentChapterId: 'chapter-1',
@@ -50,13 +51,13 @@ describe('Reader Component - Conflict Handling', () => {
         }
     };
 
-    const createMockDoc = (data: any) => ({
+    const createMockDoc = (data: { _rev: string } & Record<string, unknown>) => ({
         ...data,
         toJSON: () => data,
         patch: vi.fn().mockImplementation(async (patchData) => {
             // Simulate conflict check
             if (data._rev !== dbState.readingState._rev) {
-                const error: any = new Error('Document update conflict');
+                const error = new Error('Document update conflict') as Error & { code: string };
                 error.code = 'CONFLICT';
                 throw error;
             }
@@ -117,7 +118,7 @@ describe('Reader Component - Conflict Handling', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        (dbModule.initDB as any).mockResolvedValue(mockDb);
+        vi.mocked(dbModule.initDB).mockResolvedValue(mockDb as unknown as RxDatabase);
         // Reset DB state
         dbState.readingState = {
             bookId: 'book-conflict',

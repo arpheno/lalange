@@ -16,14 +16,12 @@ function App() {
   const { theme } = useSettingsStore()
   const aiState = useAIStore()
 
-  // Sync view state with book selection
-  useEffect(() => {
-    if (currentBook) {
+  const handleOpenBook = (book: BookDocType | null) => {
+    setCurrentBook(book);
+    if (book) {
       setView('reader');
-    } else if (view === 'reader') {
-      setView('library');
     }
-  }, [currentBook]);
+  };
 
   // Apply theme to body
   useEffect(() => {
@@ -95,7 +93,7 @@ function App() {
             onOpenSettings={() => setView('settings')}
           />
         ) : (
-          <Library onOpenBook={setCurrentBook} />
+          <Library onOpenBook={handleOpenBook} />
         )}
       </div>
 

@@ -54,7 +54,7 @@ class MockFileReader {
         if (this.onloadend) this.onloadend();
     }
 }
-global.FileReader = MockFileReader as any;
+vi.stubGlobal('FileReader', MockFileReader);
 
 // Mock crypto.randomUUID
 global.crypto.randomUUID = vi.fn().mockReturnValue('test-book-id');

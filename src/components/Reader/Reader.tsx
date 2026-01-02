@@ -25,7 +25,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     const [chapters, setChapters] = useState<ChapterDocType[]>([]);
     const [showSidebar, setShowSidebar] = useState(false);
     const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
-    const [, setTick] = useState(0); // Force re-render for live time updates
+    const [now, setNow] = useState(Date.now()); // Force re-render for live time updates
 
     const prevContainerRef = useRef<HTMLDivElement>(null);
     const nextContainerRef = useRef<HTMLDivElement>(null);
@@ -50,99 +50,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     const savedChapterIndexRef = useRef(0);
     const summaryWordsRef = useRef<string[]>([]);
 
-    // Sync refs
-    useEffect(() => {
-        if (!isSummaryActiveRef.current) {
-            wpmRef.current = wpm;
-        }
-    }, [wpm]);
-
-    useEffect(() => {
-        chaptersRef.current = chapters;
-    }, [chapters]);
-
-    useEffect(() => {
-        currentChapterRef.current = currentChapter;
-    }, [currentChapter]);
-
-    useEffect(() => {
-        isPlayingRef.current = isPlaying;
-        if (!isPlaying) {
-            saveProgress();
-            setCurrentWordIndex(indexRef.current);
-        } else {
-            lastTimeRef.current = undefined;
-            accumulatorRef.current = 0;
-            requestRef.current = requestAnimationFrame(loop);
-        }
-        return () => {
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
-        };
-    }, [isPlaying]);
-
-    // Load initial state & Subscribe to chapters
-    useEffect(() => {
-        let sub: any;
-        const loadState = async () => {
-            setLoading(true);
-            const db = await initDB();
-
-            // Subscribe to chapters
-            sub = db.chapters.find({
-                selector: { bookId: book.id },
-                sort: [{ index: 'asc' }]
-            }).$.subscribe(docs => {
-                setChapters(docs.map(d => d.toJSON() as ChapterDocType));
-            });
-
-            // Get reading state
-            let state = await db.reading_states.findOne(book.id).exec();
-            if (!state) {
-                // Create default state if missing
-                state = await db.reading_states.insert({
-                    bookId: book.id,
-                    currentChapterId: book.chapterIds[0],
-                    currentWordIndex: 0,
-                    lastRead: Date.now(),
-                    highlights: []
-                });
-            }
-
-            const stateDoc = state.toJSON() as ReadingStateDocType;
-            setReadingState(stateDoc);
-
-            // Load chapter
-            if (stateDoc.currentChapterId) {
-                loadChapter(stateDoc.currentChapterId, stateDoc.currentWordIndex);
-            } else {
-                setLoading(false);
-            }
-        };
-        loadState();
-        return () => {
-            if (sub) sub.unsubscribe();
-        };
-    }, [book.id]);
-
-    // Live update sidebar for processing chapters
-    useEffect(() => {
-        const hasProcessing = chapters.some(c => c.status === 'processing');
-        if (hasProcessing) {
-            const interval = setInterval(() => {
-                setTick(t => t + 1); // Force re-render
-            }, 1000);
-            return () => clearInterval(interval);
-        }
-    }, [chapters]);
-
-    // Effect to render word when chapter or index changes, ensuring ref is available
-    useEffect(() => {
-        if (!loading && currentChapter && wordsRef.current.length > 0) {
-            renderWord(currentWordIndex, wordsRef.current);
-        }
-    }, [loading, currentChapter, currentWordIndex]);
-
-    const saveProgress = async () => {
+    const saveProgress = React.useCallback(async () => {
         if (loading || !readingState || !currentChapter) return;
         const db = await initDB();
         const doc = await db.reading_states.findOne(book.id).exec();
@@ -153,127 +61,9 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                 lastRead: Date.now()
             });
         }
-    };
+    }, [loading, readingState, currentChapter, book.id]);
 
-    // Ref to hold the current chapter subscription
-    const chapterSubRef = useRef<any>(null);
-
-    const loadChapter = async (chapterId: string, initialIndex: number = 0, autoPlay: boolean = false) => {
-        setIsPlaying(false);
-        setLoading(true);
-        // Use a local flag to track if this is the first emission (load) or subsequent (update)
-        let isFirstEmission = true;
-
-        const db = await initDB();
-
-        // Unsubscribe previous
-        if (chapterSubRef.current) {
-            chapterSubRef.current.unsubscribe();
-            chapterSubRef.current = null;
-        }
-
-        // Subscribe to the chapter document
-        chapterSubRef.current = db.chapters.findOne(chapterId).$.subscribe(async (doc) => {
-            if (!doc) return;
-            const chapterDoc = doc.toJSON() as ChapterDocType;
-
-            // Allow loading if ready OR if processing but has content
-            const isReadable = chapterDoc.status === 'ready' || (chapterDoc.status === 'processing' && chapterDoc.content.length > 0);
-
-            if (!isReadable) {
-                return;
-            }
-
-            if (isFirstEmission) {
-                isFirstEmission = false;
-                setCurrentChapter(chapterDoc);
-                wordsRef.current = chapterDoc.content;
-                densitiesRef.current = chapterDoc.densities || [];
-
-                indexRef.current = initialIndex;
-                setCurrentWordIndex(initialIndex);
-                renderWord(initialIndex, chapterDoc.content);
-                setLoading(false);
-                setShowSidebar(false);
-
-                // Update state immediately if starting fresh
-                if (initialIndex === 0) {
-                    const stateDoc = await db.reading_states.findOne(book.id).exec();
-                    if (stateDoc) {
-                        await stateDoc.incrementalPatch({
-                            currentChapterId: chapterId,
-                            currentWordIndex: 0
-                        });
-                    }
-                }
-
-                if (autoPlay) {
-                    setIsPlaying(true);
-                }
-            } else {
-                // Live update
-                setCurrentChapter(chapterDoc);
-                wordsRef.current = chapterDoc.content;
-                densitiesRef.current = chapterDoc.densities || [];
-                renderWord(indexRef.current, chapterDoc.content);
-            }
-        });
-    };
-
-    // Cleanup subscription on unmount
-    useEffect(() => {
-        return () => {
-            if (chapterSubRef.current) chapterSubRef.current.unsubscribe();
-        };
-    }, []);
-
-    const scrollIntervalRef = useRef<any>(null);
-    const scrollStartTimeRef = useRef<number>(0);
-
-    const startScrolling = (direction: 'back' | 'fwd') => {
-        if (scrollIntervalRef.current) return;
-
-        scrollStartTimeRef.current = Date.now();
-
-        const scrollLoop = () => {
-            const now = Date.now();
-            const elapsed = now - scrollStartTimeRef.current;
-
-            // Exponential speed increase:
-            // Start slow (1 word per tick) for first 1s
-            // Then ramp up speed
-            let speed = 1;
-            if (elapsed > 1000) {
-                // After 1s, speed increases based on time
-                // e.g. at 2s -> speed 5, at 3s -> speed 10
-                speed = Math.floor(1 + (elapsed - 1000) / 200);
-            }
-
-            const newIndex = direction === 'back'
-                ? Math.max(0, indexRef.current - speed)
-                : Math.min(wordsRef.current.length - 1, indexRef.current + speed);
-
-            if (newIndex !== indexRef.current) {
-                indexRef.current = newIndex;
-                setCurrentWordIndex(newIndex);
-                renderWord(newIndex, wordsRef.current);
-                scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
-            } else {
-                scrollIntervalRef.current = null; // Stop if hit boundary
-            }
-        };
-
-        scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
-    };
-
-    const stopScrolling = () => {
-        if (scrollIntervalRef.current) {
-            cancelAnimationFrame(scrollIntervalRef.current);
-            scrollIntervalRef.current = null;
-        }
-    };
-
-    const renderWord = (idx: number, words: string[]) => {
+    const renderWord = React.useCallback((idx: number, words: string[]) => {
         // Update RSVP Display
         if (rsvpRef.current) {
             const currentWord = words[idx];
@@ -334,6 +124,117 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
             nextContainerRef.current.innerHTML = html;
             // Scroll to top (default)
         }
+    }, []);
+
+    // Ref to hold the current chapter subscription
+    const chapterSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+
+    const loadChapter = React.useCallback(async (chapterId: string, initialIndex: number = 0, autoPlay: boolean = false) => {
+        setIsPlaying(false);
+        setLoading(true);
+        // Use a local flag to track if this is the first emission (load) or subsequent (update)
+        let isFirstEmission = true;
+
+        const db = await initDB();
+
+        // Unsubscribe previous
+        if (chapterSubRef.current) {
+            chapterSubRef.current.unsubscribe();
+            chapterSubRef.current = null;
+        }
+
+        // Subscribe to the chapter document
+        chapterSubRef.current = db.chapters.findOne(chapterId).$.subscribe(async (doc) => {
+            if (!doc) return;
+            const chapterDoc = doc.toJSON() as ChapterDocType;
+
+            // Allow loading if ready OR if processing but has content
+            const isReadable = chapterDoc.status === 'ready' || (chapterDoc.status === 'processing' && chapterDoc.content.length > 0);
+
+            if (!isReadable) {
+                return;
+            }
+
+            if (isFirstEmission) {
+                isFirstEmission = false;
+                setCurrentChapter(chapterDoc);
+                wordsRef.current = chapterDoc.content;
+                densitiesRef.current = chapterDoc.densities || [];
+
+                indexRef.current = initialIndex;
+                setCurrentWordIndex(initialIndex);
+                renderWord(initialIndex, chapterDoc.content);
+                setLoading(false);
+                setShowSidebar(false);
+
+                // Update state immediately if starting fresh
+                if (initialIndex === 0) {
+                    const stateDoc = await db.reading_states.findOne(book.id).exec();
+                    if (stateDoc) {
+                        await stateDoc.incrementalPatch({
+                            currentChapterId: chapterId,
+                            currentWordIndex: 0
+                        });
+                    }
+                }
+
+                if (autoPlay) {
+                    setIsPlaying(true);
+                }
+            } else {
+                // Live update
+                setCurrentChapter(chapterDoc);
+                wordsRef.current = chapterDoc.content;
+                densitiesRef.current = chapterDoc.densities || [];
+                renderWord(indexRef.current, chapterDoc.content);
+            }
+        });
+    }, [renderWord, book.id]);
+
+    const scrollIntervalRef = useRef<number | null>(null);
+    const scrollStartTimeRef = useRef<number>(0);
+
+    const startScrolling = (direction: 'back' | 'fwd') => {
+        if (scrollIntervalRef.current) return;
+
+        scrollStartTimeRef.current = Date.now();
+
+        const scrollLoop = () => {
+            const now = Date.now();
+            const elapsed = now - scrollStartTimeRef.current;
+
+            // Exponential speed increase:
+            // Start slow (1 word per tick) for first 1s
+            // Then ramp up speed
+            let speed = 1;
+            if (elapsed > 1000) {
+                // After 1s, speed increases based on time
+                // e.g. at 2s -> speed 5, at 3s -> speed 10
+                speed = Math.floor(1 + (elapsed - 1000) / 200);
+            }
+
+            const newIndex = direction === 'back'
+                ? Math.max(0, indexRef.current - speed)
+                : Math.min(wordsRef.current.length - 1, indexRef.current + speed);
+
+            if (newIndex !== indexRef.current) {
+                indexRef.current = newIndex;
+                setCurrentWordIndex(newIndex);
+                renderWord(newIndex, wordsRef.current);
+                scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
+            } else {
+                scrollIntervalRef.current = null; // Stop if hit boundary
+            }
+        };
+
+        scrollIntervalRef.current = requestAnimationFrame(scrollLoop);
+    };
+
+    const stopScrolling = () => {
+        if (scrollIntervalRef.current) {
+            cancelAnimationFrame(scrollIntervalRef.current);
+            scrollIntervalRef.current = null;
+        }
     };
 
     const handleRiverClick = (e: React.MouseEvent) => {
@@ -380,7 +281,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
         }
     };
 
-    const loop = (time: number) => {
+    const loop = React.useCallback(function loopInternal(time: number) {
         if (!isPlayingRef.current) return;
 
         if (!lastTimeRef.current) lastTimeRef.current = time;
@@ -480,8 +381,100 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
             renderWord(indexRef.current, activeWords);
         }
 
-        requestRef.current = requestAnimationFrame(loop);
-    };
+        requestRef.current = requestAnimationFrame(loopInternal);
+    }, [wpm, renderWord, loadChapter]);
+
+    // Sync refs
+    useEffect(() => {
+        if (!isSummaryActiveRef.current) {
+            wpmRef.current = wpm;
+        }
+    }, [wpm]);
+
+    useEffect(() => {
+        chaptersRef.current = chapters;
+    }, [chapters]);
+
+    useEffect(() => {
+        currentChapterRef.current = currentChapter;
+    }, [currentChapter]);
+
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+        if (!isPlaying) {
+            saveProgress();
+            setCurrentWordIndex(indexRef.current);
+        } else {
+            lastTimeRef.current = undefined;
+            accumulatorRef.current = 0;
+            requestRef.current = requestAnimationFrame(loop);
+        }
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        };
+    }, [isPlaying, saveProgress, loop]);
+
+    // Load initial state & Subscribe to chapters
+    useEffect(() => {
+        let sub: { unsubscribe: () => void };
+        const loadState = async () => {
+            setLoading(true);
+            const db = await initDB();
+
+            // Subscribe to chapters
+            sub = db.chapters.find({
+                selector: { bookId: book.id },
+                sort: [{ index: 'asc' }]
+            }).$.subscribe(docs => {
+                setChapters(docs.map(d => d.toJSON() as ChapterDocType));
+            });
+
+            // Get reading state
+            let state = await db.reading_states.findOne(book.id).exec();
+            if (!state) {
+                // Create default state if missing
+                state = await db.reading_states.insert({
+                    bookId: book.id,
+                    currentChapterId: book.chapterIds[0],
+                    currentWordIndex: 0,
+                    lastRead: Date.now(),
+                    highlights: []
+                });
+            }
+
+            const stateDoc = state.toJSON() as ReadingStateDocType;
+            setReadingState(stateDoc);
+
+            // Load chapter
+            if (stateDoc.currentChapterId) {
+                loadChapter(stateDoc.currentChapterId, stateDoc.currentWordIndex);
+            } else {
+                setLoading(false);
+            }
+        };
+        loadState();
+        return () => {
+            if (sub) sub.unsubscribe();
+        };
+    }, [book.id, book.chapterIds, loadChapter]);
+
+    // Live update sidebar for processing chapters
+    useEffect(() => {
+        const hasProcessing = chapters.some(c => c.status === 'processing');
+        if (hasProcessing) {
+            const interval = setInterval(() => {
+                setNow(Date.now());
+            }, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [chapters]);
+
+    // Effect to render word when chapter or index changes, ensuring ref is available
+    useEffect(() => {
+        if (!loading && currentChapter && wordsRef.current.length > 0) {
+            renderWord(currentWordIndex, wordsRef.current);
+        }
+    }, [loading, currentChapter, currentWordIndex, renderWord]);
 
     const getDensityColor = (score: number) => {
         if (score < 0.8) return 'text-gray-500';
@@ -551,6 +544,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                     onInspectChapter={setInspectingChapter}
                     wpm={wpm}
                     currentWordIndex={currentWordIndex}
+                    now={now}
                 />
             </div>
             {/* Backdrop for sidebar */}

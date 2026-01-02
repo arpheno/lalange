@@ -43,8 +43,8 @@ export const initialIngest = async (file: File, onProgress?: (msg: string) => vo
     const $opf = cheerio.load(opfContent, { xmlMode: true });
 
     // Metadata
-    let title = $opf('dc\\:title').text() || file.name.replace('.epub', '');
-    let author = $opf('dc\\:creator').text() || 'Unknown';
+    const title = $opf('dc\\:title').text() || file.name.replace('.epub', '');
+    const author = $opf('dc\\:creator').text() || 'Unknown';
     console.log(`[Pipeline] Metadata parsed: Title="${title}", Author="${author}"`);
 
     // Spine
@@ -191,7 +191,7 @@ export const processChaptersInBackground = async (bookId: string) => {
             let currentDoc = await chapterDoc.patch({ status: 'processing', progress: 0 });
 
             try {
-                let fullPath = opfDir + href;
+                const fullPath = opfDir + href;
                 let fileInZip = zip.file(fullPath);
                 if (!fileInZip) {
                     const filename = href.split('/').pop();
@@ -238,7 +238,7 @@ export const processChaptersInBackground = async (bookId: string) => {
                     console.log(`[Pipeline] Chapter ${chapterIndex + 1}: Split into ${rawChunks.length} chunks for AI processing.`);
                     let allWords: string[] = [];
                     let allDensities: number[] = [];
-                    let subchapters: { title: string; summary: string; startWordIndex: number; endWordIndex: number }[] = [];
+                    const subchapters: { title: string; summary: string; startWordIndex: number; endWordIndex: number }[] = [];
 
                     for (let i = 0; i < rawChunks.length; i++) {
                         const chunk = rawChunks[i];
@@ -461,7 +461,7 @@ ${chunk.substring(0, 3000)}
                     const latestDoc = await db.chapters.findOne(currentDoc.id).exec();
                     if (latestDoc) await latestDoc.incrementalPatch({ status: 'error' });
                 }
-            } catch (e: any) {
+            } catch (e) {
                 console.error(`Failed to process chapter ${chapterId}`, e);
                 const latestDoc = await db.chapters.findOne(currentDoc.id).exec();
                 if (latestDoc) await latestDoc.incrementalPatch({ status: 'error' });
@@ -471,7 +471,7 @@ ${chunk.substring(0, 3000)}
     }
 };
 
-export const analyzeDensityRange = async (words: string[], onMetrics?: (metrics: any) => void): Promise<number[]> => {
+export const analyzeDensityRange = async (words: string[], onMetrics?: (metrics: Record<string, unknown>) => void): Promise<number[]> => {
     const text = words.join(' ');
 
     // Split into sentences (naive split, but sufficient for this purpose)

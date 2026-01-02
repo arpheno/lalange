@@ -19,10 +19,10 @@ export const checkAIHealth = async (modelTier?: ModelTier): Promise<boolean> => 
 
 export interface AICompletionResult {
     response: string;
-    metrics?: any;
+    metrics?: Record<string, unknown>;
 }
 
-export const generateUnifiedCompletion = async (prompt: string, modelTier?: ModelTier): Promise<{ response: string, metrics?: any }> => {
+export const generateUnifiedCompletion = async (prompt: string, modelTier?: ModelTier): Promise<{ response: string, metrics?: Record<string, unknown> }> => {
     const { llmModel } = useSettingsStore.getState();
     const targetModel = modelTier || (llmModel as ModelTier);
 

@@ -16,19 +16,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     const settings = useSettingsStore();
     const aiState = useAIStore();
 
-    const checkCache = async () => {
+    const checkCache = React.useCallback(async () => {
         const status: Record<string, boolean> = {};
         for (const tier of ['tiny', 'balanced', 'pro'] as const) {
             status[tier] = await isModelCached(tier);
         }
         setCachedModels(status);
-    };
+    }, []);
 
     useEffect(() => {
         if (activeTab === 'ai') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             checkCache();
         }
-    }, [activeTab]);
+    }, [activeTab, checkCache]);
 
     const tabs: { id: SettingsTab; label: string; icon: string }[] = [
         { id: 'general', label: 'General', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
@@ -285,7 +286,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                         ].map((opt) => (
                                             <button
                                                 key={opt.id}
-                                                onClick={() => settings.setPacingGranularity(opt.id as any)}
+                                                onClick={() => settings.setPacingGranularity(opt.id as 'paragraph' | 'sentence' | 'word')}
                                                 className={clsx(
                                                     "flex items-center p-4 rounded-lg border text-left transition-all",
                                                     settings.pacingGranularity === opt.id

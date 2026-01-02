@@ -31,7 +31,7 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
     let totalWords = 0;
 
     // Iterate through the spine
-    // @ts-ignore - epubjs types are incomplete
+    // @ts-expect-error - epubjs types are incomplete
     const spineItems = book.spine.items;
 
     for (let i = 0; i < spineItems.length; i++) {
@@ -39,13 +39,13 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
         try {
             // Load the chapter
             let doc: Document;
-            // @ts-ignore
+            // @ts-expect-error - epubjs types are incomplete
             if (typeof item.load === 'function') {
-                // @ts-ignore
+                // @ts-expect-error - epubjs types are incomplete
                 doc = await item.load(book.load.bind(book));
             } else {
                 // Fallback: load directly via book.load
-                // @ts-ignore
+                // @ts-expect-error - epubjs types are incomplete
                 const loaded = await book.load(item.href);
                 if (typeof loaded === 'string') {
                     const parser = new DOMParser();
@@ -74,9 +74,9 @@ export const ingestEpub = async (file: File): Promise<{ book: BookDocType, chapt
             }
 
             // Unload to free memory
-            // @ts-ignore
+            // @ts-expect-error - epubjs types are incomplete
             if (typeof item.unload === 'function') {
-                // @ts-ignore
+                // @ts-expect-error - epubjs types are incomplete
                 item.unload();
             }
         } catch (e) {

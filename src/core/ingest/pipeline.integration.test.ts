@@ -62,9 +62,11 @@ describe('Pipeline Integration (WebLLM)', () => {
 
         // Polyfill arrayBuffer for test environment if missing
         if (!file.arrayBuffer) {
-            (file as any).arrayBuffer = async () => {
-                return new Uint8Array(buffer).buffer;
-            };
+            Object.defineProperty(file, 'arrayBuffer', {
+                value: async () => {
+                    return new Uint8Array(buffer).buffer;
+                }
+            });
         }
 
         // 2. Initial Ingest

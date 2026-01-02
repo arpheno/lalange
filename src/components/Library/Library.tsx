@@ -18,7 +18,7 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
     const { sidebarOpen } = useSettingsStore();
 
     useEffect(() => {
-        let sub: any;
+        let sub: { unsubscribe: () => void };
         const setup = async () => {
             const db = await initDB();
             sub = db.books.find().$.subscribe(docs => {
@@ -55,9 +55,9 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
 
             // Start background processing
             processChaptersInBackground(book.id).catch(console.error);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            alert(err.message || 'Failed to load book');
+            alert((err as Error).message || 'Failed to load book');
         } finally {
             setLoading(false);
             setStatus('');
@@ -78,9 +78,9 @@ export const Library: React.FC<LibraryProps> = ({ onOpenBook }) => {
             const blob = await res.blob();
             const file = new File([blob], 'test_book.epub', { type: 'application/epub+zip' });
             await ingestBook(file);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error(e);
-            alert(e.message);
+            alert((e as Error).message);
             setLoading(false);
             setStatus('');
         }
