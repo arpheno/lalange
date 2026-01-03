@@ -41,6 +41,12 @@ export class IngestionScheduler {
         this.rebalancePriorities();
     }
 
+    public removeTasksForBook(bookId: string) {
+        const count = this.tasks.filter(t => t.bookId === bookId).length;
+        this.tasks = this.tasks.filter(t => t.bookId !== bookId);
+        console.log(`[Scheduler] Removed ${count} tasks for book ${bookId}`);
+    }
+
     public addTask(task: Omit<IngestionTask, 'priority' | 'status'>) {
         // Check if task already exists
         const exists = this.tasks.find(t => 
@@ -148,7 +154,15 @@ export class IngestionScheduler {
     }
 
     private async executeTask(task: IngestionTask) {
+        // Double check if task is still valid (might have been removed from queue but reference held)
+        // Or if book was deleted
         const db = await initDB();
+        const bookExists = await db.books.findOne(task.bookId).exec();
+        if (!bookExists) {
+            console.log(`[Scheduler] Skipping task for deleted book ${task.bookId}`);
+            return;
+        }
+
         const settings = useSettingsStore.getState();
         const aiState = useAIStore.getState();
 

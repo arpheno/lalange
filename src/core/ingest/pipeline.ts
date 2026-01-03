@@ -22,6 +22,8 @@ export const stopProcessing = (bookId: string) => {
         state.stopped = true;
         console.log(`[Pipeline] Stop signal received for book ${bookId}`);
     }
+    // Also cancel any pending scheduler tasks
+    scheduler.removeTasksForBook(bookId);
 };
 
 export const isProcessing = (bookId: string) => activeJobs.has(bookId);

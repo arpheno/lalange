@@ -65,6 +65,11 @@ describe('IngestionScheduler', () => {
                 findOne: vi.fn().mockReturnValue({
                     exec: vi.fn().mockResolvedValue(mockChapter)
                 })
+            },
+            books: {
+                findOne: vi.fn().mockReturnValue({
+                    exec: vi.fn().mockResolvedValue({ id: 'book1' })
+                })
             }
         };
         (initDB as any).mockResolvedValue(mockDB);
