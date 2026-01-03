@@ -4,6 +4,7 @@ import { Librarian } from './components/Library/Librarian'
 import { Reader } from './components/Reader/Reader'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import { Manifesto } from './components/Manifesto'
+import { ModelDownloadModal } from './components/ModelDownloadModal'
 import type { BookDocType } from './core/sync/db'
 import { useSettingsStore } from './core/store/settings'
 import { useAIStore } from './core/store/ai'
@@ -87,6 +88,8 @@ function App() {
       <div className="flex-1 w-full overflow-auto flex justify-center relative">
         {/* Mica Dust Layer */}
         <div className="mica-dust-layer" />
+
+        <ModelDownloadModal />
 
         {view === 'settings' ? (
           <SettingsPanel onClose={handleCloseSettings} />

@@ -5,6 +5,8 @@ import { getPunctuationDelay } from '../../core/rsvp/timing';
 import { Sidebar } from './Sidebar';
 import { useSettingsStore } from '../../core/store/settings';
 
+import { scheduler } from '../../core/ingest/scheduler';
+
 interface ReaderProps {
     book: BookDocType;
     onBack?: () => void;
@@ -21,10 +23,18 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     const [readingState, setReadingState] = useState<ReadingStateDocType | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Update Scheduler Cursor
+    useEffect(() => {
+        if (currentChapter) {
+            scheduler.setCursor(book.id, currentChapter.id, currentWordIndex);
+        }
+    }, [book.id, currentChapter, currentWordIndex]);
+
     // Sidebar & Chapters
     const [chapters, setChapters] = useState<ChapterDocType[]>([]);
     const [showSidebar, setShowSidebar] = useState(true);
-    const [inspectingChapter, setInspectingChapter] = useState<ChapterDocType | null>(null);
+    const [inspectingChapterId, setInspectingChapterId] = useState<string | null>(null);
+    const inspectingChapter = chapters.find(c => c.id === inspectingChapterId);
     const [now, setNow] = useState(Date.now()); // Force re-render for live time updates
 
     const prevContainerRef = useRef<HTMLDivElement>(null);
@@ -303,8 +313,10 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
 
             const currentWord = activeWords[indexRef.current] || '';
             const density = activeDensities[indexRef.current];
-            const currentDensity = density !== undefined ? density : 1.0;
-            // If density is 0 (junk), we ignore punctuation delay to ensure it's skipped instantly
+            // Treat 0 as 1.0 (Pending Analysis) for speed purposes
+            const currentDensity = (density !== undefined && density > 0) ? density : 1.0;
+            // If density is 0 (junk/pending), we ignore punctuation delay to ensure it's skipped instantly if junk, or normal if pending
+            // Actually, if it's pending (0), we want normal flow. If it's junk (we don't have a junk flag here, junk is removed in pipeline), so 0 just means pending.
             const punctuationDelay = currentDensity === 0 ? 0 : getPunctuationDelay(currentWord, baseInterval);
 
             const targetInterval = (baseInterval * currentDensity) + punctuationDelay;
@@ -477,6 +489,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
     }, [loading, currentChapter, currentWordIndex, renderWord]);
 
     const getDensityColor = (score: number) => {
+        if (score === 0) return 'text-gray-700 opacity-50'; // Pending
         if (score < 0.8) return 'text-gray-500';
         if (score < 1.5) return 'text-gray-300';
         if (score < 2.5) return 'text-yellow-500';
@@ -545,7 +558,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                         loadChapter(id, index || 0);
                         setShowSidebar(false);
                     }}
-                    onInspectChapter={setInspectingChapter}
+                    onInspectChapter={(chapter) => setInspectingChapterId(chapter.id)}
                     wpm={wpm}
                     currentWordIndex={currentWordIndex}
                     now={now}
@@ -644,7 +657,7 @@ export const Reader: React.FC<ReaderProps> = ({ book, onOpenSettings }) => {
                         <div className="flex justify-between items-center p-4 border-b border-white/10">
                             <h2 className="font-mono text-xl font-bold text-dune-gold tracking-widest uppercase">{inspectingChapter.title} // DENSITY_MAP</h2>
                             <button
-                                onClick={() => setInspectingChapter(null)}
+                                onClick={() => setInspectingChapterId(null)}
                                 className="text-gray-400 hover:text-magma-vent transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

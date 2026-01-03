@@ -161,6 +161,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             currentWordIndex >= sub.startWordIndex &&
                                             (currentWordIndex < sub.endWordIndex || (idx === chapter.subchapters!.length - 1 && currentWordIndex >= sub.startWordIndex));
 
+                                        // Calculate Density Progress
+                                        const densitySlice = chapter.densities?.slice(sub.startWordIndex, sub.endWordIndex) || [];
+                                        const processedDensityCount = densitySlice.filter(d => d > 0).length;
+                                        const densityProgress = densitySlice.length > 0 ? processedDensityCount / densitySlice.length : 0;
+
                                         return (
                                             <div key={idx} className="flex flex-col relative group/sub">
                                                 {/* Active Reading Highlight */}
@@ -170,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                         isActive ? "opacity-100 bg-white/5" : "opacity-0"
                                                     )}
                                                 />
-                                                {/* Health Bar Background */}
+                                                {/* Health Bar Background (Readiness) */}
                                                 <div
                                                     className={clsx(
                                                         "absolute inset-0 transition-all duration-1000 ease-out rounded-sm",
@@ -182,25 +187,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                     }}
                                                 />
 
-                                                <div className="flex items-center justify-between relative z-10 pl-1">
-                                                    <button
-                                                        className={clsx(
-                                                            "flex-1 text-left text-[10px] py-1 transition-colors truncate pr-2",
-                                                            isActive ? "text-white font-bold" : (isFullyReady ? "text-gray-500 hover:text-dune-gold" : (isSafeToRead ? "text-canarian-pine font-bold" : "text-dune-gold font-bold"))
-                                                        )}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (isExpanded) {
-                                                                if (hasStarted) {
-                                                                    onLoadChapter(chapter.id, sub.startWordIndex);
+                                                <div className="flex items-center justify-between relative z-10 pl-1 py-1">
+                                                    <div className="flex-1 min-w-0 pr-2">
+                                                        <button
+                                                            className={clsx(
+                                                                "text-left text-[10px] transition-colors truncate w-full",
+                                                                isActive ? "text-white font-bold" : (isFullyReady ? "text-gray-500 hover:text-dune-gold" : (isSafeToRead ? "text-canarian-pine font-bold" : "text-dune-gold font-bold"))
+                                                            )}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (isExpanded) {
+                                                                    if (hasStarted) {
+                                                                        onLoadChapter(chapter.id, sub.startWordIndex);
+                                                                    }
+                                                                } else {
+                                                                    setExpandedSummary(summaryId);
                                                                 }
-                                                            } else {
-                                                                setExpandedSummary(summaryId);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {sub.title} {!isFullyReady && "..."}
-                                                    </button>
+                                                            }}
+                                                        >
+                                                            {sub.title} {!isFullyReady && "..."}
+                                                        </button>
+                                                        
+                                                        {/* Density Progress Bar */}
+                                                        {densityProgress < 1 && densityProgress > 0 && (
+                                                            <div className="w-full h-0.5 bg-gray-800 mt-1 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className="h-full bg-magma-vent transition-all duration-500"
+                                                                    style={{ width: `${densityProgress * 100}%` }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
 
                                                     <button
                                                         onClick={(e) => {
@@ -211,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                         }}
                                                         disabled={!hasStarted}
                                                         className={clsx(
-                                                            "p-1 rounded hover:bg-white/10 transition-colors",
+                                                            "p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0",
                                                             hasStarted ? "text-dune-gold" : "text-gray-600 opacity-50 cursor-not-allowed"
                                                         )}
                                                         title="Read Subchapter"
@@ -231,6 +248,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             </div>
                                         );
                                     })}
+                                    
+                                    {/* Processing Indicator for Next Chunk */}
+                                    {isProcessing && (
+                                        <div className="pl-1 py-1 text-[10px] text-dune-gold animate-pulse italic flex items-center gap-2">
+                                            <span className="w-1 h-1 bg-dune-gold rounded-full"/>
+                                            Summarizing next chunk...
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

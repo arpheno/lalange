@@ -37,6 +37,8 @@ interface SettingsState {
     toggleLicenseAnnihilator: () => void;
     structuralScrubber: boolean;
     setStructuralScrubber: (enabled: boolean) => void;
+    enableJunkRemoval: boolean;
+    setEnableJunkRemoval: (enabled: boolean) => void;
     footnoteSuppressor: boolean;
     setFootnoteSuppressor: (enabled: boolean) => void;
     manualOverrideRules: string;
@@ -130,6 +132,8 @@ export const useSettingsStore = create<SettingsState>()(
             toggleLicenseAnnihilator: () => set((state) => ({ licenseAnnihilator: !state.licenseAnnihilator })),
             structuralScrubber: true,
             setStructuralScrubber: (structuralScrubber) => set({ structuralScrubber }),
+            enableJunkRemoval: true,
+            setEnableJunkRemoval: (enableJunkRemoval) => set({ enableJunkRemoval }),
             footnoteSuppressor: true,
             setFootnoteSuppressor: (footnoteSuppressor) => set({ footnoteSuppressor }),
             manualOverrideRules: '',
@@ -163,7 +167,7 @@ export const useSettingsStore = create<SettingsState>()(
             setPacingSensitivity: (pacingSensitivity) => set({ pacingSensitivity }),
 
             // Librarian Defaults
-            librarianModelTier: 'tiny',
+            librarianModelTier: 'balanced',
             setLibrarianModelTier: (librarianModelTier) => set({ librarianModelTier }),
             librarianBasePrompt: 'You are the Scansion Librarian, a knowledgeable, slightly eccentric guide to the world\'s classics. Your goal is to recommend public domain books from Project Gutenberg.',
             setLibrarianBasePrompt: (librarianBasePrompt) => set({ librarianBasePrompt }),
@@ -181,7 +185,7 @@ export const useSettingsStore = create<SettingsState>()(
             setLibrarianModel: (librarianModel) => set({ librarianModel }),
 
             // Summarizer Defaults
-            summarizerModel: 'tiny',
+            summarizerModel: 'balanced',
             setSummarizerModel: (summarizerModel) => set({ summarizerModel }),
             summarizerBasePrompt: 'Summarize the following text in 5 sentences.',
             setSummarizerBasePrompt: (summarizerBasePrompt) => set({ summarizerBasePrompt }),

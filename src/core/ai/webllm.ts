@@ -1,10 +1,45 @@
 import { CreateMLCEngine, MLCEngine, type InitProgressCallback, hasModelInCache, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
 import { useAIStore } from "../store/ai";
 
+export const MODEL_INFO = {
+    tiny: {
+        id: "Llama-3.2-1B-Instruct-q4f32_1-MLC",
+        name: "Tiny (Llama 3.2 1B)",
+        size: "600 MB",
+        description: "Fastest, low memory. Good for basic tasks."
+    },
+    balanced: {
+        id: "Llama-3.2-3B-Instruct-q4f32_1-MLC",
+        name: "Balanced (Llama 3.2 3B)",
+        size: "1.8 GB",
+        description: "Best trade-off between speed and quality."
+    },
+    pro: {
+        id: "Mistral-7B-Instruct-v0.3-q4f16_1-MLC",
+        name: "Pro (Mistral 7B)",
+        size: "4.1 GB",
+        description: "High quality, requires more memory."
+    },
+    creative: {
+        id: "gemma-2-9b-it-q4f16_1-MLC",
+        name: "The Prose King (Gemma 2 9B)",
+        size: "5.7 GB",
+        description: "Writes better summaries. Tighter context (8k)."
+    },
+    reliable: {
+        id: "Llama-3.1-8B-Instruct-q4f32_1-MLC",
+        name: "The Safe Backup (Llama 3.1 8B)",
+        size: "4.6 GB",
+        description: "Faster than Gemma, slightly more robotic."
+    }
+} as const;
+
 export const MODEL_MAPPING = {
-    tiny: "Llama-3.2-1B-Instruct-q4f32_1-MLC",
-    balanced: "Llama-3.2-3B-Instruct-q4f32_1-MLC",
-    pro: "Mistral-7B-Instruct-v0.3-q4f16_1-MLC"
+    tiny: MODEL_INFO.tiny.id,
+    balanced: MODEL_INFO.balanced.id,
+    pro: MODEL_INFO.pro.id,
+    creative: MODEL_INFO.creative.id,
+    reliable: MODEL_INFO.reliable.id
 } as const;
 
 export type ModelTier = keyof typeof MODEL_MAPPING;
@@ -17,9 +52,28 @@ export const getEngine = async (
 ): Promise<MLCEngine> => {
     const modelId = MODEL_MAPPING[tier];
     const { setProgress, setLoading, setReady } = useAIStore.getState();
+    const startTime = Date.now();
 
     const onProgress: InitProgressCallback = (report) => {
-        setProgress(`[${tier.toUpperCase()}] (${modelId}) ${report.text}`, report.progress);
+        const info = MODEL_INFO[tier];
+        let timeInfo = "";
+
+        if (report.progress > 0.01 && report.progress < 1) {
+            const elapsed = (Date.now() - startTime) / 1000;
+            const estimatedTotal = elapsed / report.progress;
+            const remaining = estimatedTotal - elapsed;
+
+            if (remaining > 0 && isFinite(remaining)) {
+                const mins = Math.floor(remaining / 60);
+                const secs = Math.floor(remaining % 60);
+                timeInfo = ` [ETA: ${mins > 0 ? `${mins}m ` : ''}${secs}s]`;
+            }
+        }
+
+        // Remove the verbose explanation text that WebLLM appends
+        const cleanText = report.text.replace(". It can take a while when we first visit this page to populate the cache. Later refreshes will become faster.", "");
+
+        setProgress(`[${info.name}] (${info.size})${timeInfo} ${cleanText}`, report.progress);
     };
 
     if (engineInstance && currentLoadedModel === modelId) {
@@ -40,6 +94,10 @@ export const getEngine = async (
         return engineInstance;
     } catch (error) {
         console.error("Failed to load WebLLM engine:", error);
+        // Check for storage quota error
+        if (error instanceof Error && (error.message.includes("NS_ERROR_FILE_NO_DEVICE_SPACE") || error.message.includes("QuotaExceededError"))) {
+            throw new Error("BROWSER_STORAGE_QUOTA_EXCEEDED");
+        }
         throw error;
     } finally {
         setLoading(false);

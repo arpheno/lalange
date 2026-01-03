@@ -1,12 +1,13 @@
 import JSZip from 'jszip';
 import * as cheerio from 'cheerio';
 import PQueue from 'p-queue';
-import { checkAIHealth, generateUnifiedCompletion, getPromptLogprobs } from '../ai/service';
+import { checkAIHealth, getPromptLogprobs } from '../ai/service';
 import { initDB, type BookDocType, type ChapterDocType, type ImageDocType, type RawFileDocType } from '../sync/db';
 import { removeLicenseText } from './license';
 import { useSettingsStore } from '../store/settings';
 import { useAIStore } from '../store/ai';
 import { generateUUID } from '../../utils/uuid';
+import { scheduler } from './scheduler';
 
 // Queue for LLM processing (concurrency: 1)
 const llmQueue = new PQueue({ concurrency: 1 });
@@ -217,7 +218,7 @@ export const processChaptersInBackground = async (bookId: string) => {
             if (chapterDoc && (chapterDoc.status === 'pending' || chapterDoc.status === 'processing' || chapterDoc.status === 'error')) {
                 console.log(`[Pipeline] Processing chapter ${chapterIndex + 1}/${spineIds.length}: ${chapterId}`);
                 // Capture the updated document instance to avoid conflict
-                let currentDoc = await chapterDoc.patch({ status: 'processing', progress: 0 });
+                const currentDoc = await chapterDoc.patch({ status: 'processing', progress: 0 });
 
                 try {
                     const fullPath = opfDir + href;
@@ -251,29 +252,17 @@ export const processChaptersInBackground = async (bookId: string) => {
                         rawText = removeLicenseText(rawText);
                         console.log(`[Pipeline] Chapter ${chapterIndex + 1}: Extracted ${rawText.length} chars of raw text.`);
 
-                        const startTime = Date.now();
-                        let processedWordsCount = 0;
-
                         // Pipeline: Clean -> Editor/Summary -> Density -> Save
                         const settings = useSettingsStore.getState();
-                        const { summarizerModel, summarizerBasePrompt, summarizerFragments } = settings;
-                        const summaryFragmentText = summarizerFragments.filter(f => f.enabled).map(f => f.text).join('\n');
-                        const summarySystemPrompt = `${summarizerBasePrompt}\n${summaryFragmentText}`;
-
-                        // Fallback for legacy setting if base prompt is empty (optional, but good for transition)
-                        const specificSummaryInstruction = settings.summaryPrompt || "Summarize the following text in 5 sentences.";
-
                         const rawChunks = chunkText(rawText, settings.summaryChunkSize || 2500);
                         console.log(`[Pipeline] Chapter ${chapterIndex + 1}: Split into ${rawChunks.length} chunks for AI processing.`);
+                        
                         let allWords: string[] = [];
                         let allDensities: number[] = [];
                         const subchapters: { title: string; summary: string; startWordIndex: number; endWordIndex: number }[] = [];
 
                         for (let i = 0; i < rawChunks.length; i++) {
                             const chunk = rawChunks[i];
-                            console.log(`[Pipeline] Processing chunk ${i + 1}/${rawChunks.length} (Length: ${chunk.length} chars)`);
-
-                            // Pre-calculate words to determine indices immediately
                             const cleanedChunk = chunk;
                             const newWords = cleanedChunk.trim().split(/\s+/).filter(w => w.length > 0);
 
@@ -283,138 +272,52 @@ export const processChaptersInBackground = async (bookId: string) => {
                             const endWordIndex = startWordIndex + newWords.length;
 
                             // --- PRE-FILL: Immediate UI Update ---
-                            // Add words and default densities immediately so the user sees text while AI processes
                             allWords = [...allWords, ...newWords];
-                            const chunkDefaultDensities = new Array(newWords.length).fill(1.0);
+                            // Use 0 as "Pending Analysis" marker
+                            const chunkDefaultDensities = new Array(newWords.length).fill(0);
                             allDensities = [...allDensities, ...chunkDefaultDensities];
 
-                            const prefillDoc = await db.chapters.findOne(currentDoc.id).exec();
-                            if (prefillDoc) {
-                                await prefillDoc.incrementalModify((docData) => ({
-                                    ...docData,
-                                    content: [...allWords],
-                                    densities: [...allDensities],
-                                    status: 'processing' // Keep processing so TPM is tracked
-                                }));
-                            }
-                            // -------------------------------------
-
-                            // Shared state for this chunk
-                            let chunkTitle = `Part ${i + 1}`;
-                            let chunkSummary = '';
-                            let isJunk = false;
-
-                            // --- Task 1: Editor/Summary (Serial) ---
-                            try {
-                                const editorPrompt = `
-${summarySystemPrompt}
-
-Analyze the following text segment from a book.
-Task:
-1. Determine if this text is "CONTENT" (narrative, story, useful info) or "JUNK" (copyright page, table of contents, list of image references, empty space, or just garbage).
-2. If CONTENT, provide a short "title" (max 5 words) and a "summary" based on this instruction: "${specificSummaryInstruction}".
-3. If JUNK, return status "JUNK".
-
-OUTPUT JSON ONLY:
-{
-  "status": "CONTENT" | "JUNK",
-  "title": "...",
-  "summary": "..."
-}
-
-TEXT:
-${chunk.substring(0, 3000)}
-`;
-                                const completionResult = await llmQueue.add(async () => {
-                                    useAIStore.getState().setActivity(`Summarizing Chunk ${i + 1}`, summarizerModel);
-                                    try {
-                                        return await generateUnifiedCompletion(editorPrompt, summarizerModel);
-                                    } finally {
-                                        useAIStore.getState().setActivity(null);
-                                    }
-                                });
-                                const response = completionResult.response;
-
-                                const jsonMatch = response.match(/\{[\s\S]*\}/);
-                                if (jsonMatch) {
-                                    const parsed = JSON.parse(jsonMatch[0]);
-                                    if (parsed.status === 'JUNK') {
-                                        console.log(`[Pipeline] Chunk ${i + 1} marked as JUNK.`);
-                                        isJunk = true;
-                                    } else {
-                                        chunkTitle = parsed.title || chunkTitle;
-                                        chunkSummary = parsed.summary || '';
-                                        console.log(`[Pipeline] Chunk ${i + 1} Summary: "${chunkTitle}" (${chunkSummary.length} chars)`);
-
-                                        // IMMEDIATE UPDATE: Save subchapter info so user sees it ASAP
-                                        const freshDoc = await db.chapters.findOne(currentDoc.id).exec();
-                                        if (freshDoc) {
-                                            await freshDoc.incrementalModify((docData) => {
-                                                const currentSubchapters = docData.subchapters || [];
-                                                return {
-                                                    ...docData,
-                                                    subchapters: [...currentSubchapters, {
-                                                        title: chunkTitle,
-                                                        summary: chunkSummary,
-                                                        startWordIndex,
-                                                        endWordIndex
-                                                    }]
-                                                };
-                                            });
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('Failed to run Editor/Summary pass', e);
-                            }
-
-                            if (isJunk) continue;
-
-                            // --- Task 2: Density Analysis (Skipped - Manual Trigger Only) ---
-                            // Density analysis is now triggered manually via estimateBookDensity()
-                            // We leave densities as default (1.0) here.
-
-                            processedWordsCount += newWords.length;
-
-                            // Update local subchapters array to match DB state (for final save)
+                            // Create placeholder subchapter
                             subchapters.push({
-                                title: chunkTitle,
-                                summary: chunkSummary,
+                                title: `Part ${i + 1}`,
+                                summary: "", // Empty summary indicates pending
                                 startWordIndex,
                                 endWordIndex
                             });
 
-                            // Final update for this chunk (Content + Densities)
-                            const elapsedMin = (Date.now() - startTime) / 60000;
-                            const wpm = elapsedMin > 0 ? Math.round(processedWordsCount / elapsedMin) : 0;
+                            // --- SCHEDULE TASKS ---
+                            // 1. Density Estimation
+                            scheduler.addTask({
+                                id: `${chapterId}_density_${i}`,
+                                bookId,
+                                chapterId,
+                                subchapterIndex: i,
+                                startWordIndex,
+                                endWordIndex,
+                                type: 'DENSITY',
+                                text: chunk
+                            });
 
-                            // Use incrementalPatch to avoid revision conflicts
-                            const latestDoc = await db.chapters.findOne(currentDoc.id).exec();
-                            if (latestDoc) {
-                                currentDoc = latestDoc;
-                                await currentDoc.incrementalPatch({
-                                    content: [...allWords],
-                                    densities: [...allDensities],
-                                    // subchapters: subchapters, // Already updated by summaryPromise, but safe to include
-                                    progress: Math.round(((i + 1) / rawChunks.length) * 100),
-                                    processingSpeed: wpm,
-                                    lastChunkCompletedAt: Date.now(),
-                                    status: 'processing'
-                                });
-                            }
+                            // 2. Summarization
+                            scheduler.addTask({
+                                id: `${chapterId}_summary_${i}`,
+                                bookId,
+                                chapterId,
+                                subchapterIndex: i,
+                                startWordIndex,
+                                endWordIndex,
+                                type: 'SUMMARY',
+                                text: chunk
+                            });
                         }
 
-                        const elapsedMin = (Date.now() - startTime) / 60000;
-                        const finalWpm = elapsedMin > 0 ? Math.round(allWords.length / elapsedMin) : 0;
-                        console.log(`[Pipeline] Chapter ${chapterId} processed: ${allWords.length} words in ${elapsedMin.toFixed(2)}m (${finalWpm} WPM)`);
-
-                        // Final update
+                        // Final update for this chapter (Content + Placeholders)
                         const finalDoc = await db.chapters.findOne(currentDoc.id).exec();
                         if (finalDoc) {
                             await finalDoc.incrementalPatch({
-                                status: 'ready',
+                                status: 'ready', // Ready for reading (even if pending analysis)
                                 content: [...allWords],
-                                densities: [...allDensities], // Should be fully populated now
+                                densities: [...allDensities],
                                 subchapters,
                                 title: extractedTitle || finalDoc.title,
                                 progress: 100
@@ -544,21 +447,18 @@ export const analyzeDensityRange = async (words: string[]): Promise<number[]> =>
     }
 };
 
-const chunkText = (text: string, maxChars: number): string[] => {
+const chunkText = (text: string, maxWords: number): string[] => {
     const words = text.split(/\s+/);
     const chunks: string[] = [];
     let currentChunk: string[] = [];
-    let currentLength = 0;
 
     for (const word of words) {
         currentChunk.push(word);
-        currentLength += word.length + 1; // +1 for space
 
-        // Break if we exceed maxChars AND we are at a sentence boundary
-        if (currentLength >= maxChars && word.match(/[.!?]["']?$/)) {
+        // Break if we exceed maxWords AND we are at a sentence boundary
+        if (currentChunk.length >= maxWords && word.match(/[.!?]["']?$/)) {
             chunks.push(currentChunk.join(' '));
             currentChunk = [];
-            currentLength = 0;
         }
     }
     if (currentChunk.length > 0) {

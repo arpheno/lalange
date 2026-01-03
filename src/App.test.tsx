@@ -21,10 +21,31 @@ vi.mock('./components/Manifesto', () => ({
 
 // Mock stores
 vi.mock('./core/store/settings', () => ({
-    useSettingsStore: () => ({ theme: 'volcanic' })
+    useSettingsStore: () => ({ 
+        theme: 'volcanic',
+        editorModel: 'tiny',
+        setEditorModel: vi.fn(),
+        setLibrarianModelTier: vi.fn(),
+        setSummarizerModel: vi.fn()
+    })
 }));
+
 vi.mock('./core/store/ai', () => ({
-    useAIStore: () => ({ activity: null })
+    useAIStore: () => ({ 
+        activity: null,
+        isLoading: false,
+        progress: '',
+        progressValue: 0
+    })
+}));
+
+// Mock WebLLM
+vi.mock('./core/ai/webllm', () => ({
+    MODEL_INFO: {
+        tiny: { name: 'Tiny', size: '600 MB', description: 'Desc' }
+    },
+    isModelCached: vi.fn().mockResolvedValue(true),
+    getEngine: vi.fn()
 }));
 
 describe('App Component', () => {

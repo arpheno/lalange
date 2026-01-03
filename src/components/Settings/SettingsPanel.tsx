@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettingsStore, type PromptFragment } from '../../core/store/settings';
 import { useAIStore } from '../../core/store/ai';
-import { getEngine, MODEL_MAPPING, type ModelTier, isModelCached, deleteModel } from '../../core/ai/webllm';
+import { getEngine, MODEL_INFO, type ModelTier, isModelCached, deleteModel } from '../../core/ai/webllm';
 import { clsx } from 'clsx';
 
 interface SettingsPanelProps {
@@ -18,7 +18,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
     const checkCache = React.useCallback(async () => {
         const status: Record<string, boolean> = {};
-        for (const tier of ['tiny', 'balanced', 'pro'] as const) {
+        for (const tier of Object.keys(MODEL_INFO) as ModelTier[]) {
             status[tier] = await isModelCached(tier);
         }
         setCachedModels(status);
@@ -42,6 +42,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
     const handleDownloadModel = async (tier: ModelTier) => {
         try {
+            // Enforce Single Model Policy: Update all tasks to use this model
+            settings.setEditorModel(tier);
+            settings.setLibrarianModelTier(tier);
+            settings.setSummarizerModel(tier);
+            
             await getEngine(tier);
             await checkCache();
         } catch (e) {
@@ -120,6 +125,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                     onChange={settings.toggleLicenseAnnihilator}
                                 />
                                 <Toggle
+                                    label="Generative Junk Removal"
+                                    description="Uses AI to detect and skip non-content chunks (TOC, Copyright, etc) during summarization."
+                                    checked={settings.enableJunkRemoval}
+                                    onChange={settings.setEnableJunkRemoval}
+                                />
+                                <Toggle
                                     label="Structural Scrubber"
                                     description="Strips out 'Chapter 1', page numbers, and Transcriber’s notes."
                                     checked={settings.structuralScrubber}
@@ -163,9 +174,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                     )}
                                 </div>
                                 <div className="divide-y divide-white/5">
-                                    {(['tiny', 'balanced', 'pro'] as const).map(tier => {
-                                        const modelId = MODEL_MAPPING[tier];
-                                        const approxSize = tier === 'tiny' ? '1.1 GB' : tier === 'balanced' ? '2.4 GB' : '4.1 GB';
+                                    {(Object.keys(MODEL_INFO) as ModelTier[]).map(tier => {
+                                        const info = MODEL_INFO[tier];
                                         const isCached = cachedModels[tier];
 
                                         return (
@@ -175,12 +185,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                                             )}>
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={clsx("font-bold capitalize", isCached ? "text-green-400" : "text-white")}>{tier}</span>
-                                                        <span className="text-xs text-gray-500 font-mono">({modelId})</span>
+                                                        <span className={clsx("font-bold capitalize", isCached ? "text-green-400" : "text-white")}>{info.name}</span>
+                                                        <span className="text-xs text-gray-500 font-mono">({info.id})</span>
                                                         {isCached && <span className="text-[10px] bg-green-900/50 text-green-400 px-1.5 py-0.5 rounded border border-green-800">CACHED</span>}
                                                     </div>
                                                     <div className="text-xs text-gray-400 mt-1">
-                                                        Required Disk Space: <span className="text-dune-gold">{approxSize}</span>
+                                                        Required Disk Space: <span className="text-dune-gold">{info.size}</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-4">
@@ -437,7 +447,6 @@ const AgentConfig: React.FC<AgentConfigProps> = ({
     title,
     description,
     model,
-    setModel,
     basePrompt,
     setBasePrompt,
     fragments,
@@ -451,25 +460,12 @@ const AgentConfig: React.FC<AgentConfigProps> = ({
             </div>
 
             <div className="bg-white/5 rounded-lg p-8 border border-white/10 space-y-8">
-                {/* Model Selection */}
+                {/* Model Info (Read Only) */}
                 <div>
-                    <label className="block text-xs text-dune-gold mb-4 uppercase tracking-widest font-bold">AI Model</label>
-                    <div className="grid grid-cols-3 gap-4">
-                        {(['tiny', 'balanced', 'pro'] as const).map(tier => (
-                            <button
-                                key={tier}
-                                onClick={() => setModel(tier)}
-                                className={clsx(
-                                    "p-4 rounded border text-left transition-all",
-                                    model === tier
-                                        ? "bg-dune-gold text-black border-dune-gold"
-                                        : "bg-black/20 border-white/10 text-gray-400 hover:border-white/30 hover:text-white"
-                                )}
-                            >
-                                <div className="font-bold uppercase text-sm">{tier}</div>
-                                <div className="text-[10px] opacity-70 mt-1">{MODEL_MAPPING[tier]}</div>
-                            </button>
-                        ))}
+                    <label className="block text-xs text-dune-gold mb-4 uppercase tracking-widest font-bold">Active Model</label>
+                    <div className="p-4 rounded border bg-dune-gold/10 border-dune-gold text-white">
+                        <div className="font-bold uppercase text-sm">{MODEL_INFO[model].name}</div>
+                        <div className="text-[10px] opacity-70 mt-1">Managed in Model Manager</div>
                     </div>
                 </div>
 
