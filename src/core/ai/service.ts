@@ -1,4 +1,4 @@
-import { generateWebLLMCompletion, getEngine, type ModelTier } from './webllm';
+import { generateWebLLMCompletion, getEngine, type ModelTier, getPromptLogprobs as getWebLLMPromptLogprobs, type LogprobItem } from './webllm';
 import { useSettingsStore } from '../store/settings';
 
 export const checkAIHealth = async (modelTier?: ModelTier): Promise<boolean> => {
@@ -28,4 +28,10 @@ export const generateUnifiedCompletion = async (prompt: string, modelTier?: Mode
 
     const result = await generateWebLLMCompletion(prompt, targetModel);
     return { response: result.response, metrics: result.usage };
+};
+
+export const getPromptLogprobs = async (text: string, modelTier?: ModelTier): Promise<LogprobItem[]> => {
+    const { llmModel } = useSettingsStore.getState();
+    const targetModel = modelTier || (llmModel as ModelTier);
+    return await getWebLLMPromptLogprobs(text, targetModel);
 };

@@ -61,6 +61,50 @@ export const generateWebLLMCompletion = async (
     };
 };
 
+export interface LogprobItem {
+    token: string;
+    logprob: number;
+    bytes?: number[] | null;
+    top_logprobs?: LogprobItem[];
+    content?: string;
+}
+
+export const getPromptLogprobs = async (
+    text: string,
+    tier: ModelTier
+): Promise<LogprobItem[]> => {
+    const engine = await getEngine(tier);
+    
+    // Configure request for "Read-Only" analysis (Forward Pass)
+    const reply = await engine.chat.completions.create({
+        messages: [{ role: "user", content: text }],
+        max_tokens: 1,       // Force immediate stop after prompt processing
+        logprobs: true,      // Enable log probability calculation
+        top_logprobs: 1,     // We only need the score of the actual token
+        // @ts-expect-error - Pass the prompt_logprobs flag to vLLM/MLC backend
+        extra_body: { prompt_logprobs: true }
+    });
+
+    // Access the prompt logprobs from the response
+    // Note: The location of prompt_logprobs depends on the specific API implementation
+    // It might be in `prompt_logprobs` at the root, or inside `choices` if using standard OpenAI format with a twist.
+    // Based on vLLM documentation, it's often a top-level field or part of the usage/debug info.
+    // We'll try to find it.
+    
+    const rawReply = reply as unknown as { prompt_logprobs?: LogprobItem[], choices?: { logprobs?: { content?: LogprobItem[] } }[] };
+    if (rawReply.prompt_logprobs) {
+        return rawReply.prompt_logprobs;
+    }
+    
+    // Fallback: check if it's in choices (unlikely for prompt logprobs but possible)
+    if (rawReply.choices?.[0]?.logprobs?.content) {
+         // This is usually for generated tokens, but let's return it if nothing else
+         return rawReply.choices[0].logprobs.content;
+    }
+
+    return [];
+};
+
 export const isModelCached = async (tier: ModelTier): Promise<boolean> => {
     const modelId = MODEL_MAPPING[tier];
     return await hasModelInCache(modelId);
